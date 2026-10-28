@@ -6,7 +6,19 @@ dependencies = [
     "alembic>=1.20.1",
     "asyncpg>=0.32.0",
     "fastapi>=0.162.0",
+    "pwdlib[argon2]>=0.3.1",
     "pydantic-settings>=2.16.1",
+    "pyjwt>=2.15.1",
     "sqlalchemy[asyncio]>=2.1.6",
     "uvicorn[standard]>=0.54.0",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+]
+
+[tool.pytest.ini_options]
+# Корень backend/ в sys.path — чтобы в тестах работал `import app`
+pythonpath = ["."]
+testpaths = ["tests"]

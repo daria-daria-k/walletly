@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     # True — SQLAlchemy печатает каждый SQL-запрос в консоль
     db_echo: bool = False
 
+    # Секрет подписи JWT: кто его знает, тот может выпустить токен от имени любого пользователя
+    jwt_secret: str
+    access_token_ttl_minutes: int = 15
+    refresh_token_ttl_days: int = 30
+
     @property
     def database_url(self) -> URL:
         # URL.create сам экранирует спецсимволы в пароле, в отличие от f-строки
