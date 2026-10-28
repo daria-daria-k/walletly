@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api.routers import health
+from app.api.routers import auth, health
 from app.core.database import engine
 
 
@@ -17,3 +17,4 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title="Walletly API", version="0.1.0", lifespan=lifespan)
 
 app.include_router(health.router)
+app.include_router(auth.router)
