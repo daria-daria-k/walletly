@@ -1,0 +1,121 @@
+import { useState, type FormEvent } from 'react';
+import { api, errorText } from '../api/client';
+import type { Transaction, TxType } from '../api/types';
+import { useAccounts, useCategoryGroups, useRefreshLedgerData } from '../lib/data';
+import { isoDate } from '../lib/format';
+import { useLedger } from '../ledger';
+import { ErrorNote, Modal } from './ui';
+
+const TYPES: { value: TxType; label: string }[] = [
+  { value: 'expense', label: 'Расход' },
+  { value: 'income', label: 'Доход' },
+  { value: 'transfer', label: 'Перевод' },
+];
+
+export function TransactionModal({ transaction, onClose }: { transaction?: Transaction; onClose: () => void }) {
+  const { base } = useLedger();
+  const { data: accounts = [] } = useAccounts();
+  const { data: groups = [] } = useCategoryGroups();
+  const refresh = useRefreshLedgerData();
+
+  const [type, setType] = useState<TxType>(transaction?.type ?? 'expense');
+  const [amount, setAmount] = useState(transaction?.amount ?? '');
+  const [accountId, setAccountId] = useState(String(transaction?.account_id ?? ''));
+  const [toAccountId, setToAccountId] = useState(String(transaction?.to_account_id ?? ''));
+  const [categoryId, setCategoryId] = useState(String(transaction?.category_id ?? ''));
+  const [description, setDescription] = useState(transaction?.description ?? '');
+  const [txDate, setTxDate] = useState(transaction?.tx_date ?? isoDate(new Date()));
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const visibleGroups = groups.filter((group) => group.type === type);
+  const effectiveAccount = accountId || String(accounts[0]?.id ?? '');
+
+  function changeType(next: TxType) {
+    setType(next);
+    setCategoryId(''); // категории доходов и расходов разные, старый выбор недействителен
+  }
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setSaving(true); // блокирует кнопку: двойной клик не создаст вторую операцию
+    setError(null);
+    const body = {
+      type,
+      amount: amount.replace(/\s/g, '').replace(',', '.'),
+      account_id: Number(effectiveAccount),
+      to_account_id: type === 'transfer' && toAccountId ? Number(toAccountId) : null,
+      category_id: type !== 'transfer' && categoryId ? Number(categoryId) : null,
+      description: description.trim() || null,
+      tx_date: txDate,
+    };
+    try {
+      if (transaction) await api(`${base}/transactions/${transaction.id}`, { method: 'PATCH', body });
+      else await api(`${base}/transactions`, { method: 'POST', body });
+      await refresh();
+      onClose();
+    } catch (err) {
+      setError(errorText(err));
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal eyebrow={transaction ? 'Редактирование' : 'Новая запись'} title={transaction ? 'Изменить операцию' : 'Добавить операцию'} onClose={onClose}>
+      <div className="type-switch three">
+        {TYPES.map((item) => (
+          <button key={item.value} type="button" className={type === item.value ? 'selected' : ''} onClick={() => changeType(item.value)}>
+            {item.label}
+          </button>
+        ))}
+      </div>
+      <form onSubmit={submit}>
+        <label>
+          Сумма
+          <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" required autoFocus />
+        </label>
+        <div className="form-grid">
+          <label>
+            {type === 'transfer' ? 'Со счёта' : 'Счёт'}
+            <select value={effectiveAccount} onChange={(e) => setAccountId(e.target.value)} required>
+              {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
+            </select>
+          </label>
+          {type === 'transfer' ? (
+            <label>
+              На счёт
+              <select value={toAccountId} onChange={(e) => setToAccountId(e.target.value)} required>
+                <option value="">Выберите</option>
+                {accounts.filter((a) => String(a.id) !== effectiveAccount).map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
+              </select>
+            </label>
+          ) : (
+            <label>
+              Категория
+              <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} required>
+                <option value="">Выберите</option>
+                {visibleGroups.map((group) => (
+                  <optgroup key={group.id} label={group.name}>
+                    {group.categories.filter((c) => c.is_active || String(c.id) === categoryId).map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                  </optgroup>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
+        <label>
+          Описание
+          <input value={description} onChange={(e) => setDescription(e.target.value)} maxLength={500} placeholder="Например, продукты на неделю" />
+        </label>
+        <label>
+          Дата
+          <input type="date" value={txDate} onChange={(e) => setTxDate(e.target.value)} required />
+        </label>
+        <ErrorNote text={accounts.length === 0 ? 'Сначала добавьте счёт на странице «Счета»' : error} />
+        <button className="primary-button submit" type="submit" disabled={saving || accounts.length === 0}>
+          {saving ? 'Сохраняем…' : 'Сохранить'}
+        </button>
+      </form>
+    </Modal>
+  );
+}

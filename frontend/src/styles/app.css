@@ -1,0 +1,47 @@
+/* Дополнения к стилям прототипа: формы входа, состояния, элементы рабочих экранов */
+.auth-page{min-height:100vh;padding:20px;background:var(--canvas);display:grid;place-items:center}
+.auth-card{animation:none;box-shadow:0 18px 60px #1522381a}
+.auth-card .brand{margin-bottom:18px;color:var(--ink)}
+.auth-card p.hint{margin:14px 0 0;color:var(--muted);font-size:13px;text-align:center}
+.auth-card a,.text-link{color:var(--mint-dark);font-weight:700}
+.modal .type-switch.three{grid-template-columns:repeat(3,1fr)}
+.type-switch button.selected{background:var(--mint-dark)}
+.form-error{margin:0;padding:10px 12px;border-radius:10px;color:#a32638;background:#ffe9ec;font-size:13px}
+.form-ok{margin:0;padding:10px 12px;border-radius:10px;color:#116b52;background:#e2f7f0;font-size:13px}
+.state{padding:40px 20px;color:var(--muted);text-align:center;font-size:14px}
+.filterbar{flex-wrap:wrap}
+.filterbar select,.filterbar input[type=date]{padding:9px 10px;border:1px solid var(--line);border-radius:10px;color:var(--ink);background:var(--surface);font-size:13px}
+.link-button{padding:0;border:0;color:inherit;background:none;font:inherit;font-weight:700;text-align:left;cursor:pointer}
+.link-button:hover{text-decoration:underline}
+.family-chip select{min-width:0;flex:1;border:0;color:inherit;background:transparent;font:inherit;outline:0}
+.family-chip select option{color:#152238}
+.nav-list a,.sidebar-bottom a{text-decoration:none}
+.row-actions{display:flex;gap:6px;flex-wrap:wrap}
+.small-button{padding:7px 10px;border:1px solid var(--line);border-radius:9px;color:var(--ink);background:var(--surface);font-size:12px;font-weight:700;cursor:pointer}
+.small-button.danger{color:#b3263a}
+.small-button:disabled{opacity:.5;cursor:default}
+.category-line{padding:9px 0;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:14px}
+.category-line.archived b{color:var(--muted);font-weight:500;text-decoration:line-through}
+.category-groups.wide{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+.page-stack{display:grid;gap:18px}
+.plain-card{padding:22px}
+.plain-card h3{margin:0 0 6px;font-size:17px}
+.plain-card>p{margin:0 0 14px;color:var(--muted);font-size:13px}
+.inline-form{display:flex;gap:8px;flex-wrap:wrap}
+.inline-form input{flex:1;min-width:180px;padding:11px 12px;border:1px solid var(--line);border-radius:11px;font-size:14px}
+.invite-line{padding:12px 0;border-top:1px solid var(--line);display:grid;gap:6px;font-size:13px}
+.invite-line code{padding:7px 9px;border-radius:8px;background:var(--canvas);font-size:12px;word-break:break-all}
+.invite-line div{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.progress-row{padding:10px 0;display:grid;gap:6px;font-size:14px}
+.progress-row>div:first-child{display:flex;justify-content:space-between;gap:10px}
+.progress-row small{color:var(--muted)}
+.bar-chart .bar-pair small{white-space:nowrap}
+.admin-table .table-head,.admin-table .table-row{grid-template-columns:1.4fr 1fr 80px 90px 80px 1.6fr}
+.errors-list{margin:12px 0 0;padding:0;list-style:none;font-size:13px}
+.errors-list li{padding:8px 0;border-top:1px solid var(--line)}
+.columns-hint{margin:10px 0 16px;color:var(--muted);font-size:13px}
+.file-input{display:block;margin-bottom:12px;font-size:14px}
+.settings-stack{display:grid;gap:18px}
+.settings-panel .form-error,.settings-panel .form-ok{margin-top:14px}
+@media(max-width:900px){.admin-table .table-head{display:none}.admin-table .table-row{grid-template-columns:1fr;gap:6px}}
+@media(max-width:640px){.table-head{display:none}.transaction-table .table-row{grid-template-columns:1fr auto;gap:6px}.table-row strong{text-align:left}}
