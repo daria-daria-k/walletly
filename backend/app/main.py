@@ -11,6 +11,7 @@ from app.api.routers import (
     auth,
     categories,
     health,
+    imports,
     invitations,
     ledgers,
     transactions,
@@ -59,6 +60,7 @@ for module in (
     categories,
     transactions,
     analytics,
+    imports,
     invitations,
     admin,
 ):

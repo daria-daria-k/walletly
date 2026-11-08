@@ -1,0 +1,276 @@
+import csv
+import io
+from collections import Counter
+from dataclasses import dataclass
+from datetime import date, datetime
+from decimal import Decimal, InvalidOperation
+
+from fastapi.concurrency import run_in_threadpool
+from openpyxl import load_workbook
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
+
+from app.models import Account, Category, LedgerMember, Transaction
+from app.models.enums import CategoryType, TransactionType
+from app.schemas.imports import ImportResult, ImportRowError
+from app.services.errors import DomainError, InvalidDataError
+from app.services.transaction import check_fields
+
+MAX_FILE_SIZE = 5 * 1024 * 1024
+MAX_ROWS = 5000
+MAX_AMOUNT = Decimal("9999999999.99")  # предел NUMERIC(12, 2)
+
+_COLUMNS = {
+    "дата": "date",
+    "тип": "type",
+    "сумма": "amount",
+    "счёт": "account",
+    "счет": "account",
+    "счёт зачисления": "to_account",
+    "счет зачисления": "to_account",
+    "категория": "category",
+    "описание": "description",
+}
+_REQUIRED = {"date", "amount", "account"}
+_TYPES = {
+    "доход": TransactionType.INCOME,
+    "расход": TransactionType.EXPENSE,
+    "перевод": TransactionType.TRANSFER,
+}
+_DATE_FORMATS = ("%d.%m.%Y", "%d.%m.%y", "%Y-%m-%d", "%d/%m/%Y")
+
+
+@dataclass(frozen=True)
+class ParsedRow:
+    number: int
+    values: dict[str, object]
+
+
+def _read_table(content: bytes, filename: str) -> list[tuple[int, list[object]]]:
+    """Возвращает пары (номер строки в файле, ячейки), включая заголовок."""
+    rows: list[tuple[int, list[object]]] = []
+    if filename.lower().endswith(".csv"):
+        # utf-8-sig: Excel сохраняет CSV с BOM, иначе он приклеится к первому заголовку
+        text = content.decode("utf-8-sig")
+        delimiter = ";" if ";" in text.split("\n", 1)[0] else ","
+        source = enumerate(csv.reader(io.StringIO(text), delimiter=delimiter), start=1)
+    else:
+        # read_only — потоковое чтение: большой файл не загружается в память целиком
+        sheet = load_workbook(io.BytesIO(content), read_only=True, data_only=True).worksheets[0]
+        source = enumerate(sheet.iter_rows(values_only=True), start=1)
+
+    for number, cells in source:
+        if all(cell is None or str(cell).strip() == "" for cell in cells):
+            continue
+        rows.append((number, list(cells)))
+        # +1 на заголовок; дальше не читаем — защита от файла-бомбы
+        if len(rows) > MAX_ROWS + 1:
+            raise InvalidDataError(f"В файле больше {MAX_ROWS} строк")
+    return rows
+
+
+def _parse_table(content: bytes, filename: str) -> list[ParsedRow]:
+    try:
+        table = _read_table(content, filename)
+    except DomainError:
+        raise
+    except Exception:  # файл от пользователя: сломан он может быть как угодно
+        raise InvalidDataError("Не удалось прочитать файл. Нужен .xlsx или .csv (UTF-8)") from None
+
+    if not table:
+        raise InvalidDataError("Файл пустой")
+    header = [_COLUMNS.get(str(cell or "").strip().lower()) for cell in table[0][1]]
+    missing = _REQUIRED - set(header)
+    if missing:
+        raise InvalidDataError("В файле нет обязательных колонок: Дата, Сумма, Счёт")
+    return [
+        ParsedRow(
+            number,
+            {name: cell for name, cell in zip(header, cells, strict=False) if name is not None},
+        )
+        for number, cells in table[1:]
+    ]
+
+
+def _text(value: object) -> str:
+    return "" if value is None else str(value).strip()
+
+
+def _parse_date(value: object) -> date:
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    for fmt in _DATE_FORMATS:
+        try:
+            return datetime.strptime(_text(value), fmt).date()
+        except ValueError:
+            continue
+    raise InvalidDataError("Неверная дата, ожидается ДД.ММ.ГГГГ")
+
+
+def _parse_amount(value: object) -> Decimal:
+    # Через str и для чисел из Excel: Decimal(0.1) сохранил бы двоичную погрешность float
+    raw = _text(value).replace(" ", "").replace(" ", "").replace(",", ".")
+    try:
+        amount = Decimal(raw)
+    except InvalidOperation:
+        raise InvalidDataError("Неверная сумма") from None
+    if not amount.is_finite() or amount == 0 or abs(amount) > MAX_AMOUNT:
+        raise InvalidDataError("Неверная сумма")
+    if amount != amount.quantize(Decimal("0.01")):
+        raise InvalidDataError("В сумме больше двух знаков после запятой")
+    return amount.quantize(Decimal("0.01"))
+
+
+class _Lookup:
+    """Поиск счетов и категорий по названию без регистра — без запроса на каждую строку."""
+
+    def __init__(self, accounts: list[Account], categories: list[Category]) -> None:
+        self.accounts: dict[str, list[Account]] = {}
+        for account in accounts:
+            self.accounts.setdefault(account.name.casefold(), []).append(account)
+        self.categories: dict[tuple[str, CategoryType], list[Category]] = {}
+        for category in categories:
+            key = (category.name.casefold(), category.group.type)
+            self.categories.setdefault(key, []).append(category)
+
+    def account(self, name: str) -> Account:
+        found = self.accounts.get(name.casefold(), [])
+        if not found:
+            raise InvalidDataError(f"Счёт «{name}» не найден")
+        if len(found) > 1:
+            raise InvalidDataError(f"Несколько счетов с названием «{name}»")
+        return found[0]
+
+    def category(self, name: str, tx_type: TransactionType) -> Category:
+        kind = CategoryType.INCOME if tx_type == TransactionType.INCOME else CategoryType.EXPENSE
+        found = self.categories.get((name.casefold(), kind), [])
+        if not found:
+            raise InvalidDataError(f"Категория «{name}» не найдена")
+        if len(found) > 1:
+            raise InvalidDataError(f"Несколько категорий с названием «{name}»")
+        return found[0]
+
+
+def _build(row: ParsedRow, lookup: _Lookup, member: LedgerMember) -> Transaction:
+    values = row.values
+    tx_date = _parse_date(values.get("date"))
+    amount = _parse_amount(values.get("amount"))
+
+    type_text = _text(values.get("type")).lower()
+    if type_text:
+        tx_type = _TYPES.get(type_text)
+        if tx_type is None:
+            raise InvalidDataError("Тип: доход, расход или перевод")
+    else:
+        # В выписках тип часто не указан: его задаёт знак суммы
+        tx_type = TransactionType.EXPENSE if amount < 0 else TransactionType.INCOME
+
+    account = lookup.account(_text(values.get("account")))
+    to_name = _text(values.get("to_account"))
+    to_account = lookup.account(to_name) if to_name else None
+    category_name = _text(values.get("category"))
+    category = lookup.category(category_name, tx_type) if category_name else None
+    check_fields(tx_type, account, to_account, category, check_active=True)
+
+    description = _text(values.get("description"))
+    if len(description) > 500:
+        raise InvalidDataError("Описание длиннее 500 символов")
+
+    return Transaction(
+        ledger_id=member.ledger_id,
+        user_id=member.user_id,
+        type=tx_type,
+        amount=abs(amount),
+        account_id=account.id,
+        to_account_id=to_account.id if to_account else None,
+        category_id=category.id if category else None,
+        description=description or None,
+        tx_date=tx_date,
+    )
+
+
+def _fingerprint(tx: Transaction) -> tuple:
+    return (
+        tx.tx_date,
+        tx.type,
+        tx.amount,
+        tx.account_id,
+        tx.to_account_id,
+        tx.category_id,
+        tx.description or "",
+    )
+
+
+async def import_transactions(
+    session: AsyncSession, member: LedgerMember, content: bytes, filename: str, *, dry_run: bool
+) -> ImportResult:
+    # Разбор файла — чистая работа CPU, в event loop он остановил бы все запросы
+    rows = await run_in_threadpool(_parse_table, content, filename)
+
+    accounts = await session.scalars(
+        select(Account).where(Account.ledger_id == member.ledger_id)
+    )
+    categories = await session.scalars(
+        select(Category)
+        .options(joinedload(Category.group))
+        .where(Category.ledger_id == member.ledger_id)
+    )
+    lookup = _Lookup(list(accounts), list(categories))
+
+    built: list[Transaction] = []
+    errors: list[ImportRowError] = []
+    for row in rows:
+        try:
+            built.append(_build(row, lookup, member))
+        except DomainError as exc:
+            errors.append(ImportRowError(row=row.number, message=exc.message))
+
+    new, skipped = await _drop_duplicates(session, member.ledger_id, built)
+
+    # Всё или ничего: иначе после исправления файла половина строк загрузилась бы дважды
+    created = len(new) if not errors else 0
+    if created and not dry_run:
+        session.add_all(new)
+        await session.commit()
+
+    return ImportResult(
+        total_rows=len(rows),
+        created=created,
+        skipped_duplicates=skipped,
+        errors=errors,
+        dry_run=dry_run,
+    )
+
+
+async def _drop_duplicates(
+    session: AsyncSession, ledger_id: int, built: list[Transaction]
+) -> tuple[list[Transaction], int]:
+    """Повторная загрузка того же файла не должна удваивать операции.
+
+    Сравниваем как мультимножества: два одинаковых кофе в первой загрузке — это две
+    настоящие покупки, а вот при повторе обе уже есть в базе и будут пропущены.
+    """
+    if not built:
+        return [], 0
+    existing = await session.scalars(
+        select(Transaction).where(
+            Transaction.ledger_id == ledger_id,
+            Transaction.is_deleted.is_(False),
+            Transaction.tx_date >= min(tx.tx_date for tx in built),
+            Transaction.tx_date <= max(tx.tx_date for tx in built),
+        )
+    )
+    remaining = Counter(_fingerprint(tx) for tx in existing)
+    new: list[Transaction] = []
+    skipped = 0
+    for tx in built:
+        key = _fingerprint(tx)
+        if remaining[key] > 0:
+            remaining[key] -= 1
+            skipped += 1
+        else:
+            new.append(tx)
+    return new, skipped
