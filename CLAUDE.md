@@ -54,8 +54,9 @@ backend/            FastAPI + async SQLAlchemy + PostgreSQL, менеджер п
   app/api/deps.py   зависимости FastAPI (сессия БД, текущий пользователь)
   migrations/       Alembic
   tests/            pytest, отдельная тестовая БД walletly_test
-docs/               решения по архитектуре: db-schema.md, auth.md
-frontent/           прототип интерфейса (vinext, React, shadcn) — отдельный git-репозиторий,
+docs/               решения по архитектуре: db-schema.md, auth.md, api.md
+frontend/           рабочий интерфейс: Vite + React + TanStack Query, nginx в Docker
+frontent/           старый прототип (vinext) — отдельный git-репозиторий,
                     карта экранов в frontent/PRODUCT_PAGES.md
 docker-compose.yml  PostgreSQL 17
 ```
@@ -63,14 +64,22 @@ docker-compose.yml  PostgreSQL 17
 ### Команды
 
 ```bash
-docker compose up -d                        # запустить БД
+docker compose up -d --build                # всё приложение: http://localhost:8080
+docker exec walletly-api python -m app.seed # демо-данные, логины напечатает команда
+docker compose up -d db                     # только БД, для разработки
 cd backend
-uv run uvicorn app.main:app --reload        # запустить API
+uv run uvicorn app.main:app --reload        # запустить API без Docker
 uv run pytest                               # тесты
 uv run alembic revision --autogenerate -m "..."   # новая миграция
 uv run alembic upgrade head                 # применить миграции
 uv run alembic check                        # модели совпадают с миграциями
+uv run python -m app.cli make-admin <email> # выдать роль администратора
+cd frontend
+npm run dev                                 # фронт на Vite, API_URL — адрес бэкенда
 ```
+
+Порты задаются в `.env`. На этом компьютере 5432 и 8000 заняты другим проектом,
+поэтому Walletly использует `POSTGRES_PORT=5433` и `API_PORT=8001`.
 
 ### Ключевые решения (подробно — в docs/)
 
@@ -81,13 +90,16 @@ uv run alembic check                        # модели совпадают с
 
 ## Текущий статус
 
-Сделано:
-- каркас бэкенда, модели всех 9 таблиц, миграции;
-- основа авторизации: Argon2, JWT, таблица refresh_tokens;
-- `POST /auth/register`;
-- `POST /auth/login`, `/auth/refresh`, `/auth/logout` + тесты (не закоммичено).
+Этапы 1–2 собраны в ветке `mvp` (backend, фронт, запуск в Docker). Решения сборки — в `docs/api.md`, все «разобрать».
 
-Дальше:
-1. Прогнать тесты и закоммитить login/refresh/logout.
-2. `get_current_user` + `GET /auth/me` + тесты.
-3. API пространств, счетов, категорий, транзакций.
+Не разобраны со мной (идём по `git log` снизу вверх, один коммит — одно занятие):
+1. Вход, обновление сессии, выход (вопросы уже заданы, ответов пока нет).
+2. Текущий пользователь, профиль, пространства.
+3. Счета с вычисляемым остатком, категории.
+4. Операции, фильтры, аналитика.
+5. Приглашения, админка.
+6. Импорт Excel/CSV.
+7. Фронтенд: клиент API, refresh между вкладками, экраны.
+8. Docker: сборка, nginx, compose.
+
+Дальше, после разбора: этап 3 (деплой, HTTPS, бэкапы), затем ML и оплата.

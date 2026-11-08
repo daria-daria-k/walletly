@@ -21,8 +21,8 @@ from app.services.auth import register_user
 from app.services.ledger import create_shared_ledger
 
 PASSWORD = "demo-password"
-DEMO_EMAIL = "demo@walletly.test"
-PARTNER_EMAIL = "partner@walletly.test"
+DEMO_EMAIL = "demo@example.com"
+PARTNER_EMAIL = "partner@example.com"
 
 EXPENSES = {
     "Продукты": (500, 4500, 9, ["Перекрёсток", "Пятёрочка", "Рынок"]),
@@ -69,7 +69,7 @@ async def _fill_ledger(session, ledger_id: int, user_id: int, rng: random.Random
                 ledger_id=ledger_id,
                 user_id=user_id,
                 type=TransactionType.TRANSFER,
-                amount=Decimal("5000"),
+                amount=Decimal("15000"),
                 account_id=card.id,
                 to_account_id=cash.id,
                 description="Снятие наличных",

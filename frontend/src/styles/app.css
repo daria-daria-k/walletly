@@ -44,4 +44,15 @@
 .settings-stack{display:grid;gap:18px}
 .settings-panel .form-error,.settings-panel .form-ok{margin-top:14px}
 @media(max-width:900px){.admin-table .table-head{display:none}.admin-table .table-row{grid-template-columns:1fr;gap:6px}}
-@media(max-width:640px){.table-head{display:none}.transaction-table .table-row{grid-template-columns:1fr auto;gap:6px}.table-row strong{text-align:left}}
+/* На телефоне строка операции — карточка: сначала название и сумма, детали ниже */
+@media(max-width:640px){
+  .transaction-table{min-width:0}
+  .transaction-table .table-head{display:none}
+  .transaction-table .table-row{grid-template-columns:1fr auto 28px;grid-template-areas:"name amount del" "category account account" "date date date";gap:6px 10px}
+  .transaction-table .table-row>:nth-child(1){grid-area:date}
+  .transaction-table .table-row>:nth-child(2){grid-area:name}
+  .transaction-table .table-row>:nth-child(3){grid-area:category}
+  .transaction-table .table-row>:nth-child(4){grid-area:account;text-align:right}
+  .transaction-table .table-row>:nth-child(5){grid-area:amount}
+  .transaction-table .table-row>:nth-child(6){grid-area:del}
+}

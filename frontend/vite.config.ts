@@ -7,6 +7,6 @@ export default defineConfig({
   server: {
     port: 5173,
     // В разработке фронт и API тоже живут на одном адресе — как за nginx на сервере
-    proxy: { '/api': 'http://localhost:8000' },
+    proxy: { '/api': process.env.API_URL ?? 'http://localhost:8000' },
   },
 });
