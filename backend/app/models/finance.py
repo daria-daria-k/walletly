@@ -1,5 +1,6 @@
 from datetime import date
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import CheckConstraint, ForeignKey, Index, Integer, Numeric, String, false, true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -7,6 +8,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base, CreatedAt, IntPK
 from app.models.category import Category
 from app.models.enums import TransactionType
+
+if TYPE_CHECKING:
+    from app.models.user import User
 
 # Деньги: 12 цифр, 2 после запятой. В Python — Decimal, не float
 Money = Numeric(12, 2)
@@ -67,3 +71,4 @@ class Transaction(Base):
     account: Mapped[Account] = relationship(foreign_keys=[account_id])
     to_account: Mapped[Account | None] = relationship(foreign_keys=[to_account_id])
     category: Mapped[Category | None] = relationship()
+    author: Mapped["User"] = relationship()
