@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     jwt_secret: str
     access_token_ttl_minutes: int = 15
     refresh_token_ttl_days: int = 30
+    # Secure-cookie передаётся только по HTTPS. Локально HTTPS нет — на сервере включим
+    cookie_secure: bool = False
 
     @property
     def database_url(self) -> URL:

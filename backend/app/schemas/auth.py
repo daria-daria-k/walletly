@@ -19,6 +19,20 @@ class RegisterRequest(BaseModel):
     name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
 
 
+class LoginRequest(BaseModel):
+    email: NormalizedEmail
+    # Без min_length: старые правила пароля могли быть мягче — не мешаем таким входить
+    password: str = Field(max_length=128)
+
+
+class TokenResponse(BaseModel):
+    """Access-токен в теле ответа. Refresh сюда не попадает — он уходит в httpOnly cookie."""
+
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int  # через сколько секунд истечёт access-токен
+
+
 class UserRead(BaseModel):
     """Что API отдаёт о пользователе. password_hash здесь нет — и не должно быть."""
 
