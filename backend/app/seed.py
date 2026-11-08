@@ -24,6 +24,8 @@ PASSWORD = "demo-password"
 DEMO_EMAIL = "demo@example.com"
 PARTNER_EMAIL = "partner@example.com"
 
+DEMO_LIMITS = {"Продукты": 25000, "Жильё и ЖКХ": 10000, "Транспорт": 5000, "Кафе и рестораны": 8000}
+
 EXPENSES = {
     "Продукты": (500, 4500, 9, ["Перекрёсток", "Пятёрочка", "Рынок"]),
     "Жильё и ЖКХ": (6000, 9000, 1, ["Квартплата"]),
@@ -47,6 +49,8 @@ async def _fill_ledger(session, ledger_id: int, user_id: int, rng: random.Random
     )
     by_name = {category.name: (category, kind) for category, kind in rows}
     salary = by_name["Зарплата"][0]
+    for name, limit in DEMO_LIMITS.items():
+        by_name[name][0].monthly_limit = Decimal(limit)
     assert by_name["Зарплата"][1] == CategoryType.INCOME
 
     start = date.today().replace(day=1)

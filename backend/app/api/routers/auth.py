@@ -10,6 +10,7 @@ from app.schemas.auth import (
     ProfileUpdate,
     RegisterRequest,
     TokenResponse,
+    UserProfile,
     UserRead,
 )
 from app.services.auth import (
@@ -20,6 +21,7 @@ from app.services.auth import (
     TokenPair,
     authenticate,
     change_password,
+    current_plan,
     issue_tokens,
     register_user,
     revoke_refresh_token,
@@ -103,8 +105,9 @@ async def logout(session: SessionDep, response: Response, refresh_token: Refresh
 
 
 @router.get("/me")
-async def me(user: CurrentUser) -> UserRead:
-    return UserRead.model_validate(user)
+async def me(user: CurrentUser, session: SessionDep) -> UserProfile:
+    plan = await current_plan(session, user.id)
+    return UserProfile(**UserRead.model_validate(user).model_dump(), plan=plan)
 
 
 @router.patch("/me")

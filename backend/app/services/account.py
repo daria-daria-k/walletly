@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal
 
 from sqlalchemy import and_, case, func, or_, select
@@ -11,13 +12,14 @@ from app.services.errors import ConflictError
 from app.services.scoped import get_in_ledger
 
 
-def _to_read(account: Account, balance: Decimal) -> AccountRead:
+def _to_read(account: Account, balance: Decimal, month_change: Decimal) -> AccountRead:
     return AccountRead(
         id=account.id,
         name=account.name,
         currency=account.currency,
         initial_balance=account.initial_balance,
         balance=balance,
+        month_change=month_change,
         is_active=account.is_active,
         sort_order=account.sort_order,
     )
@@ -35,7 +37,14 @@ def _balances_query():
         else_=-Transaction.amount,
     )
     return (
-        select(Account, Account.initial_balance + func.coalesce(func.sum(delta), 0))
+        select(
+            Account,
+            Account.initial_balance + func.coalesce(func.sum(delta), 0),
+            # FILTER: тем же проходом по операциям считаем сумму только за этот месяц
+            func.coalesce(
+                func.sum(delta).filter(Transaction.tx_date >= date.today().replace(day=1)), 0
+            ),
+        )
         # LEFT JOIN: счёт без операций тоже должен попасть в результат
         .outerjoin(
             Transaction,
@@ -55,14 +64,12 @@ async def list_accounts(
     if not include_archived:
         query = query.where(Account.is_active.is_(True))
     rows = await session.execute(query.order_by(Account.sort_order, Account.id))
-    return [_to_read(account, balance) for account, balance in rows]
+    return [_to_read(*row) for row in rows]
 
 
 async def _read_one(session: AsyncSession, account_id: int) -> AccountRead:
-    account, balance = (
-        await session.execute(_balances_query().where(Account.id == account_id))
-    ).one()
-    return _to_read(account, balance)
+    row = (await session.execute(_balances_query().where(Account.id == account_id))).one()
+    return _to_read(*row)
 
 
 async def create_account(session: AsyncSession, ledger_id: int, data: AccountCreate) -> AccountRead:

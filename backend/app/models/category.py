@@ -1,4 +1,6 @@
-from sqlalchemy import ForeignKey, Integer, String, UniqueConstraint, true
+from decimal import Decimal
+
+from sqlalchemy import ForeignKey, Integer, Numeric, String, UniqueConstraint, true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, IntPK
@@ -32,6 +34,8 @@ class Category(Base):
         ForeignKey("category_groups.id", ondelete="RESTRICT")
     )
     name: Mapped[str] = mapped_column(String(50))
+    # Лимит расходов в месяц; None — без лимита. Отдельной таблицы нет: лимит один на категорию
+    monthly_limit: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     is_active: Mapped[bool] = mapped_column(default=True, server_default=true())
     sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 

@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -162,3 +164,15 @@ async def test_create_group_and_category(client: AsyncClient, register: Register
         headers=anna.headers,
     )
     assert category.status_code == 201
+
+
+async def test_category_limit_set_and_cleared(client: AsyncClient, register: RegisterFn) -> None:
+    anna = await register()
+    category = (await groups(client, anna))[1]["categories"][0]
+    url = f"/api/ledgers/{anna.ledger_id}/categories/{category['id']}"
+
+    response = await client.patch(url, json={"monthly_limit": "25000"}, headers=anna.headers)
+    assert Decimal(response.json()["monthly_limit"]) == 25000
+    assert (await client.patch(url, json={"monthly_limit": "0"}, headers=anna.headers)).status_code == 422
+    response = await client.patch(url, json={"monthly_limit": None}, headers=anna.headers)
+    assert response.json()["monthly_limit"] is None

@@ -94,6 +94,16 @@ async def register_user(session: AsyncSession, data: RegisterRequest) -> User:
 # --- Профиль ---
 
 
+async def current_plan(session: AsyncSession, user_id: int) -> Plan:
+    # Действующий тариф — последняя запись: старые подписки остаются как история
+    return await session.scalar(
+        select(Subscription.plan)
+        .where(Subscription.user_id == user_id)
+        .order_by(Subscription.id.desc())
+        .limit(1)
+    )
+
+
 async def update_profile(session: AsyncSession, user: User, name: str) -> User:
     user.name = name
     await session.commit()

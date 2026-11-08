@@ -3,7 +3,7 @@ from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr, Field, StringConstraints
 
-from app.models.enums import UserRole
+from app.models.enums import Plan, UserRole
 
 # Email приводим к нижнему регистру: Anna@Mail.ru и anna@mail.ru — один пользователь
 NormalizedEmail = Annotated[EmailStr, AfterValidator(str.lower)]
@@ -53,3 +53,9 @@ class UserRead(BaseModel):
     name: str
     role: UserRole
     created_at: datetime
+
+
+class UserProfile(UserRead):
+    """Текущий пользователь: интерфейсу нужен ещё и тариф."""
+
+    plan: Plan

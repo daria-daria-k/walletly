@@ -28,5 +28,6 @@ class AccountRead(BaseModel):
     currency: str
     initial_balance: Decimal
     balance: Decimal
+    month_change: Decimal  # изменение остатка с начала текущего месяца
     is_active: bool
     sort_order: int

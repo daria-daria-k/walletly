@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import date, timedelta
 
 import pytest
 from httpx import AsyncClient
@@ -245,3 +246,30 @@ async def test_analytics_excludes_transfers_and_other_currency(
         {"month": "2026-09", "income": "1000.00", "expense": "300.00"},
         {"month": "2026-10", "income": "0", "expense": "50.00"},
     ]
+
+
+async def test_account_month_change_counts_only_this_month(
+    client: AsyncClient, world: World
+) -> None:
+    today = date.today()
+    previous_month = today.replace(day=1) - timedelta(days=1)
+    await expense(client, world, amount="70", tx_date=previous_month.isoformat())
+    await expense(client, world, amount="30", tx_date=today.isoformat())
+
+    accounts = (await client.get(f"{world.base}/accounts", headers=world.user.headers)).json()
+    sber = next(a for a in accounts if a["name"] == "Сбер")
+    assert (sber["balance"], sber["month_change"]) == ("900.00", "-30.00")
+
+
+async def test_expenses_by_author(
+    client: AsyncClient, session: AsyncSession, world: World, register: RegisterFn
+) -> None:
+    boris = await register("boris@example.com", "Борис")
+    session.add(LedgerMember(ledger_id=world.user.ledger_id, user_id=boris.id))
+    await session.commit()
+    await expense(client, world, amount="100")
+    body = {"type": "expense", "amount": "300", "tx_date": "2026-10-15", "account_id": world.sber, "category_id": world.food}
+    await client.post(f"{world.base}/transactions", json=body, headers=boris.headers)
+
+    rows = (await client.get(f"{world.base}/analytics/by-author", headers=world.user.headers)).json()
+    assert [(r["name"], r["total"]) for r in rows] == [("Борис", "300.00"), ("Анна", "100.00")]

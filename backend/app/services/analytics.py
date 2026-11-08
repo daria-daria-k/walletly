@@ -4,9 +4,9 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Account, Category, CategoryGroup, Transaction
+from app.models import Account, Category, CategoryGroup, Transaction, User
 from app.models.enums import TransactionType
-from app.schemas.transaction import AnalyticsSummary, CategoryTotal, MonthTotal
+from app.schemas.transaction import AnalyticsSummary, AuthorTotal, CategoryTotal, MonthTotal
 
 # Переводы в аналитику не входят: это перемещение своих денег, а не доход и не расход
 _REAL_TYPES = (TransactionType.INCOME, TransactionType.EXPENSE)
@@ -77,6 +77,30 @@ async def by_category(
         CategoryTotal(category_id=row[0], category_name=row[1], group_name=row[2], total=row[3])
         for row in rows
     ]
+
+
+async def by_author(
+    session: AsyncSession,
+    ledger_id: int,
+    currency: str,
+    date_from: date | None,
+    date_to: date | None,
+) -> list[AuthorTotal]:
+    total = func.sum(Transaction.amount)
+    rows = await session.execute(
+        _scoped(
+            select(User.id, User.name, total)
+            .join(User, Transaction.user_id == User.id)
+            .where(Transaction.type == TransactionType.EXPENSE)
+            .group_by(User.id, User.name)
+            .order_by(total.desc()),
+            ledger_id,
+            currency,
+            date_from,
+            date_to,
+        )
+    )
+    return [AuthorTotal(user_id=row[0], name=row[1], total=row[2]) for row in rows]
 
 
 async def monthly(

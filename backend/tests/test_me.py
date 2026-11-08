@@ -15,6 +15,7 @@ async def test_me_returns_current_user(client: AsyncClient, register: RegisterFn
     response = await client.get("/api/auth/me", headers=anna.headers)
     assert response.status_code == 200
     assert response.json()["id"] == anna.id
+    assert response.json()["plan"] == "free"
 
 
 async def test_me_without_token_is_unauthorized(client: AsyncClient) -> None:

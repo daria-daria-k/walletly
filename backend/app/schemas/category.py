@@ -1,7 +1,9 @@
+from decimal import Decimal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.enums import CategoryType
-from app.schemas.common import Name50
+from app.schemas.common import Name50, PositiveMoney
 
 
 class CategoryGroupCreate(BaseModel):
@@ -19,12 +21,15 @@ class CategoryGroupUpdate(BaseModel):
 class CategoryCreate(BaseModel):
     category_group_id: int
     name: Name50
+    monthly_limit: PositiveMoney | None = None
     sort_order: int = 0
 
 
 class CategoryUpdate(BaseModel):
     category_group_id: int = Field(default=None)
     name: Name50 = Field(default=None)
+    # null здесь осмысленный: снять лимит
+    monthly_limit: PositiveMoney | None = None
     is_active: bool = Field(default=None)
     sort_order: int = Field(default=None)
 
@@ -35,6 +40,7 @@ class CategoryRead(BaseModel):
     id: int
     category_group_id: int
     name: str
+    monthly_limit: Decimal | None
     is_active: bool
     sort_order: int
 

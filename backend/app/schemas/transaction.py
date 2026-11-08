@@ -66,6 +66,12 @@ class CategoryTotal(BaseModel):
     total: Decimal
 
 
+class AuthorTotal(BaseModel):
+    user_id: int
+    name: str
+    total: Decimal
+
+
 class MonthTotal(BaseModel):
     month: str  # YYYY-MM
     income: Decimal
