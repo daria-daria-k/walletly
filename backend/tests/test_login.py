@@ -15,18 +15,18 @@ CREDENTIALS = {"email": "anna@example.com", "password": "s3cret-pass"}
 
 @pytest.fixture
 async def user_id(client: AsyncClient) -> int:
-    response = await client.post("/auth/register", json=CREDENTIALS | {"name": "Анна"})
+    response = await client.post("/api/auth/register", json=CREDENTIALS | {"name": "Анна"})
     return response.json()["id"]
 
 
 async def login(client: AsyncClient) -> Response:
-    return await client.post("/auth/login", json=CREDENTIALS)
+    return await client.post("/api/auth/login", json=CREDENTIALS)
 
 
 async def refresh_with(client: AsyncClient, token: str) -> Response:
     """Refresh с конкретным токеном — как будто его предъявил другой браузер."""
     client.cookies.clear()
-    return await client.post("/auth/refresh", headers={"Cookie": f"refresh_token={token}"})
+    return await client.post("/api/auth/refresh", headers={"Cookie": f"refresh_token={token}"})
 
 
 async def active_tokens_count(session: AsyncSession) -> int:
@@ -51,12 +51,12 @@ async def test_login_returns_access_token_and_refresh_cookie(
 
     cookie_header = response.headers["set-cookie"]
     assert "HttpOnly" in cookie_header
-    assert "Path=/auth" in cookie_header
+    assert "Path=/api/auth" in cookie_header
     assert "SameSite=strict" in cookie_header
 
 
 async def test_login_email_is_case_insensitive(client: AsyncClient, user_id: int) -> None:
-    response = await client.post("/auth/login", json=CREDENTIALS | {"email": "ANNA@example.com"})
+    response = await client.post("/api/auth/login", json=CREDENTIALS | {"email": "ANNA@example.com"})
 
     assert response.status_code == 200
 
@@ -71,7 +71,7 @@ async def test_login_email_is_case_insensitive(client: AsyncClient, user_id: int
 async def test_wrong_credentials_give_same_error(
     client: AsyncClient, user_id: int, credentials: dict
 ) -> None:
-    response = await client.post("/auth/login", json=credentials)
+    response = await client.post("/api/auth/login", json=credentials)
 
     # Одинаковый ответ — нельзя узнать, существует ли email
     assert response.status_code == 401
@@ -150,7 +150,7 @@ async def test_refresh_without_valid_cookie_rejected(client: AsyncClient, token:
     client.cookies.clear()
     headers = {"Cookie": f"refresh_token={token}"} if token else {}
 
-    response = await client.post("/auth/refresh", headers=headers)
+    response = await client.post("/api/auth/refresh", headers=headers)
 
     assert response.status_code == 401
     assert 'refresh_token=""' in response.headers["set-cookie"]  # cookie удаляется
@@ -164,7 +164,7 @@ async def test_logout_revokes_refresh_token(
 ) -> None:
     token = (await login(client)).cookies["refresh_token"]
 
-    response = await client.post("/auth/logout")
+    response = await client.post("/api/auth/logout")
 
     assert response.status_code == 204
     assert 'refresh_token=""' in response.headers["set-cookie"]

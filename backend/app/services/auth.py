@@ -16,8 +16,6 @@ from app.core.security import (
     verify_password,
 )
 from app.models import (
-    Category,
-    CategoryGroup,
     Ledger,
     LedgerMember,
     RefreshToken,
@@ -26,7 +24,7 @@ from app.models import (
 )
 from app.models.enums import LedgerType, MemberRole, Plan
 from app.schemas.auth import RegisterRequest
-from app.services.category_template import DEFAULT_CATEGORY_GROUPS
+from app.services.ledger import add_default_categories
 
 
 class EmailAlreadyRegisteredError(Exception):
@@ -80,17 +78,7 @@ async def register_user(session: AsyncSession, data: RegisterRequest) -> User:
     # так мы получаем ledger.id для категорий, а откатить всё ещё можно
     await session.flush()
 
-    for group_order, (group_name, category_type, category_names) in enumerate(
-        DEFAULT_CATEGORY_GROUPS
-    ):
-        group = CategoryGroup(
-            ledger_id=ledger.id, name=group_name, type=category_type, sort_order=group_order
-        )
-        group.categories = [
-            Category(ledger_id=ledger.id, name=name, sort_order=order)
-            for order, name in enumerate(category_names)
-        ]
-        session.add(group)
+    await add_default_categories(session, ledger.id)
 
     try:
         await session.commit()
@@ -101,6 +89,26 @@ async def register_user(session: AsyncSession, data: RegisterRequest) -> User:
         raise EmailAlreadyRegisteredError from None
 
     return user
+
+
+# --- Профиль ---
+
+
+async def update_profile(session: AsyncSession, user: User, name: str) -> User:
+    user.name = name
+    await session.commit()
+    return user
+
+
+async def change_password(
+    session: AsyncSession, user: User, current_password: str, new_password: str
+) -> TokenPair:
+    """Меняет пароль и завершает все сессии: если пароль утёк, вор потеряет доступ."""
+    if not await run_in_threadpool(verify_password, current_password, user.password_hash):
+        raise InvalidCredentialsError
+    user.password_hash = await run_in_threadpool(hash_password, new_password)
+    await revoke_all_refresh_tokens(session, user.id)
+    return await issue_tokens(session, user.id)
 
 
 # --- Вход ---
@@ -143,6 +151,15 @@ async def issue_tokens(session: AsyncSession, user_id: int) -> TokenPair:
     return TokenPair(access_token=create_access_token(user_id), refresh_token=refresh_token)
 
 
+async def revoke_all_refresh_tokens(session: AsyncSession, user_id: int) -> None:
+    """Без commit: вызывающий код фиксирует отзыв вместе со своими изменениями."""
+    await session.execute(
+        update(RefreshToken)
+        .where(RefreshToken.user_id == user_id, RefreshToken.revoked_at.is_(None))
+        .values(revoked_at=datetime.now(UTC))
+    )
+
+
 async def rotate_refresh_token(session: AsyncSession, refresh_token: str) -> TokenPair:
     """Обменивает refresh-токен на новую пару. Старый refresh становится недействительным."""
     now = datetime.now(UTC)
@@ -159,11 +176,7 @@ async def rotate_refresh_token(session: AsyncSession, refresh_token: str) -> Tok
     if stored.revoked_at is not None:
         # Отозванный токен предъявили повторно — значит, его копия у кого-то ещё.
         # Мы не знаем, у кого настоящий — завершаем все сессии пользователя
-        await session.execute(
-            update(RefreshToken)
-            .where(RefreshToken.user_id == stored.user_id, RefreshToken.revoked_at.is_(None))
-            .values(revoked_at=now)
-        )
+        await revoke_all_refresh_tokens(session, stored.user_id)
         await session.commit()
         raise InvalidRefreshTokenError
 

@@ -14,7 +14,7 @@ VALID = {"email": "Anna@Example.com", "password": "s3cret-pass", "name": "  Ан
 
 
 async def test_register_returns_user_without_password(client: AsyncClient) -> None:
-    response = await client.post("/auth/register", json=VALID)
+    response = await client.post("/api/auth/register", json=VALID)
 
     assert response.status_code == 201
     body = response.json()
@@ -28,7 +28,7 @@ async def test_register_returns_user_without_password(client: AsyncClient) -> No
 async def test_register_creates_personal_workspace(
     client: AsyncClient, session: AsyncSession
 ) -> None:
-    await client.post("/auth/register", json=VALID)
+    await client.post("/api/auth/register", json=VALID)
 
     user = await session.scalar(select(User))
     assert verify_password("s3cret-pass", user.password_hash)
@@ -53,9 +53,9 @@ async def test_register_creates_personal_workspace(
 
 
 async def test_duplicate_email_in_other_case_rejected(client: AsyncClient) -> None:
-    await client.post("/auth/register", json=VALID)
+    await client.post("/api/auth/register", json=VALID)
 
-    response = await client.post("/auth/register", json=VALID | {"email": "ANNA@example.COM"})
+    response = await client.post("/api/auth/register", json=VALID | {"email": "ANNA@example.COM"})
 
     assert response.status_code == 409
 
@@ -70,6 +70,6 @@ async def test_duplicate_email_in_other_case_rejected(client: AsyncClient) -> No
     ],
 )
 async def test_invalid_data_rejected(client: AsyncClient, override: dict) -> None:
-    response = await client.post("/auth/register", json=VALID | override)
+    response = await client.post("/api/auth/register", json=VALID | override)
 
     assert response.status_code == 422

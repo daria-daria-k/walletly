@@ -2,9 +2,16 @@ from typing import Annotated
 
 from fastapi import APIRouter, Cookie, HTTPException, Response, status
 
-from app.api.deps import SessionDep
+from app.api.deps import CurrentUser, SessionDep
 from app.core.config import settings
-from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserRead
+from app.schemas.auth import (
+    ChangePasswordRequest,
+    LoginRequest,
+    ProfileUpdate,
+    RegisterRequest,
+    TokenResponse,
+    UserRead,
+)
 from app.services.auth import (
     EmailAlreadyRegisteredError,
     InactiveUserError,
@@ -12,17 +19,19 @@ from app.services.auth import (
     InvalidRefreshTokenError,
     TokenPair,
     authenticate,
+    change_password,
     issue_tokens,
     register_user,
     revoke_refresh_token,
     rotate_refresh_token,
+    update_profile,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 REFRESH_COOKIE = "refresh_token"
-# Браузер отправит cookie только на /auth/* — остальным эндпоинтам refresh не нужен
-REFRESH_COOKIE_PATH = "/auth"
+# Браузер отправит cookie только на /api/auth/* — остальным эндпоинтам refresh не нужен
+REFRESH_COOKIE_PATH = "/api/auth"
 
 RefreshCookie = Annotated[str | None, Cookie(alias=REFRESH_COOKIE)]
 
@@ -91,6 +100,29 @@ async def logout(session: SessionDep, response: Response, refresh_token: Refresh
     if refresh_token is not None:
         await revoke_refresh_token(session, refresh_token)
     _delete_refresh_cookie(response)
+
+
+@router.get("/me")
+async def me(user: CurrentUser) -> UserRead:
+    return UserRead.model_validate(user)
+
+
+@router.patch("/me")
+async def update_me(data: ProfileUpdate, user: CurrentUser, session: SessionDep) -> UserRead:
+    return UserRead.model_validate(await update_profile(session, user, data.name))
+
+
+@router.post("/change-password")
+async def change_my_password(
+    data: ChangePasswordRequest, user: CurrentUser, session: SessionDep, response: Response
+) -> TokenResponse:
+    try:
+        tokens = await change_password(session, user, data.current_password, data.new_password)
+    except InvalidCredentialsError:
+        # 400, а не 401: сессия действительна, неверно только поле формы.
+        # На 401 фронт попытался бы обновить токен и выкинул пользователя на вход
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Неверный текущий пароль") from None
+    return _token_response(response, tokens)
 
 
 def _expired_cookie_header() -> str:

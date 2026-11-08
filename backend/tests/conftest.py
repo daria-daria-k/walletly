@@ -1,7 +1,8 @@
 """Общие фикстуры pytest. Файл conftest.py pytest подхватывает автоматически."""
 
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
+from dataclasses import dataclass
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -80,3 +81,30 @@ async def client(db_engine: AsyncEngine) -> AsyncIterator[AsyncClient]:
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         yield client
     app.dependency_overrides.clear()
+
+
+@dataclass(frozen=True)
+class AuthedUser:
+    id: int
+    headers: dict[str, str]
+    ledger_id: int  # личное пространство
+
+
+RegisterFn = Callable[..., Awaitable[AuthedUser]]
+
+
+@pytest.fixture
+def register(client: AsyncClient) -> RegisterFn:
+    """Фабрика: регистрирует и логинит пользователя, возвращает заголовки для запросов."""
+
+    async def _register(email: str = "anna@example.com", name: str = "Анна") -> AuthedUser:
+        credentials = {"email": email, "password": "s3cret-pass"}
+        user = (await client.post("/api/auth/register", json=credentials | {"name": name})).json()
+        login = await client.post("/api/auth/login", json=credentials)
+        # Refresh-cookie здесь не нужна, а общий клиент иначе смешает cookie разных людей
+        client.cookies.clear()
+        headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+        ledgers = (await client.get("/api/ledgers", headers=headers)).json()
+        return AuthedUser(id=user["id"], headers=headers, ledger_id=ledgers[0]["id"])
+
+    return _register
