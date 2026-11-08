@@ -103,6 +103,44 @@ async def _load_account(session: AsyncSession, ledger_id: int, account_id: int) 
     return account
 
 
+def check_fields(
+    tx_type: TransactionType,
+    account: Account,
+    to_account: Account | None,
+    category: Category | None,
+    *,
+    check_active: bool,
+) -> None:
+    """Правила, которые не выразить CHECK-ограничением: они смотрят в другие таблицы.
+
+    Чистая функция без запросов к БД: импорт проверяет тысячи строк по уже загруженным данным.
+    """
+    if check_active and not account.is_active:
+        raise InvalidDataError("Счёт в архиве")
+
+    if tx_type == TransactionType.TRANSFER:
+        if to_account is None or to_account.id == account.id:
+            raise InvalidDataError("Для перевода нужен другой счёт зачисления")
+        if category is not None:
+            raise InvalidDataError("У перевода не бывает категории")
+        if check_active and not to_account.is_active:
+            raise InvalidDataError("Счёт зачисления в архиве")
+        # В операции одна сумма: при разных валютах она значила бы разное на двух счетах
+        if to_account.currency != account.currency:
+            raise InvalidDataError("Перевод возможен только между счетами в одной валюте")
+        return
+
+    if to_account is not None:
+        raise InvalidDataError("Счёт зачисления бывает только у перевода")
+    if category is None:
+        raise InvalidDataError("Укажите категорию")
+    if check_active and not category.is_active:
+        raise InvalidDataError("Категория в архиве")
+    expected = CategoryType.INCOME if tx_type == TransactionType.INCOME else CategoryType.EXPENSE
+    if category.group.type != expected:
+        raise InvalidDataError("Тип категории не совпадает с типом операции")
+
+
 async def validate_fields(
     session: AsyncSession,
     ledger_id: int,
@@ -113,40 +151,20 @@ async def validate_fields(
     *,
     check_active: bool,
 ) -> None:
-    """Правила, которые не выразить CHECK-ограничением: они смотрят в другие таблицы."""
     account = await _load_account(session, ledger_id, account_id)
-    if check_active and not account.is_active:
-        raise InvalidDataError("Счёт в архиве")
-
-    if tx_type == TransactionType.TRANSFER:
-        if to_account_id is None or to_account_id == account_id:
-            raise InvalidDataError("Для перевода нужен другой счёт зачисления")
-        if category_id is not None:
-            raise InvalidDataError("У перевода не бывает категории")
-        to_account = await _load_account(session, ledger_id, to_account_id)
-        if check_active and not to_account.is_active:
-            raise InvalidDataError("Счёт зачисления в архиве")
-        # В операции одна сумма: при разных валютах она значила бы разное на двух счетах
-        if to_account.currency != account.currency:
-            raise InvalidDataError("Перевод возможен только между счетами в одной валюте")
-        return
-
+    to_account = None
     if to_account_id is not None:
-        raise InvalidDataError("Счёт зачисления бывает только у перевода")
-    if category_id is None:
-        raise InvalidDataError("Укажите категорию")
-    category = await session.scalar(
-        select(Category)
-        .options(joinedload(Category.group))
-        .where(Category.id == category_id, Category.ledger_id == ledger_id)
-    )
-    if category is None:
-        raise InvalidDataError("Категория не найдена в этом пространстве")
-    if check_active and not category.is_active:
-        raise InvalidDataError("Категория в архиве")
-    expected = CategoryType.INCOME if tx_type == TransactionType.INCOME else CategoryType.EXPENSE
-    if category.group.type != expected:
-        raise InvalidDataError("Тип категории не совпадает с типом операции")
+        to_account = await _load_account(session, ledger_id, to_account_id)
+    category = None
+    if category_id is not None:
+        category = await session.scalar(
+            select(Category)
+            .options(joinedload(Category.group))
+            .where(Category.id == category_id, Category.ledger_id == ledger_id)
+        )
+        if category is None:
+            raise InvalidDataError("Категория не найдена в этом пространстве")
+    check_fields(tx_type, account, to_account, category, check_active=check_active)
 
 
 def _ensure_can_edit(tx: Transaction, member: LedgerMember) -> None:

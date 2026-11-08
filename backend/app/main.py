@@ -4,7 +4,17 @@ from contextlib import asynccontextmanager
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from app.api.routers import accounts, analytics, auth, categories, health, ledgers, transactions
+from app.api.routers import (
+    accounts,
+    admin,
+    analytics,
+    auth,
+    categories,
+    health,
+    invitations,
+    ledgers,
+    transactions,
+)
 from app.core.database import engine
 from app.services.errors import (
     ConflictError,
@@ -41,6 +51,16 @@ async def domain_error_handler(request: Request, exc: DomainError) -> JSONRespon
 # Единый префикс: фронт и API живут на одном домене, прокси отправляет /api/* в бэкенд.
 # Так не нужен CORS, а cookie с SameSite=strict работает без оговорок
 api = APIRouter(prefix="/api")
-for module in (health, auth, ledgers, accounts, categories, transactions, analytics):
+for module in (
+    health,
+    auth,
+    ledgers,
+    accounts,
+    categories,
+    transactions,
+    analytics,
+    invitations,
+    admin,
+):
     api.include_router(module.router)
 app.include_router(api)
