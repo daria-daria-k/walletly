@@ -34,3 +34,49 @@ export function initials(name: string): string {
 }
 
 export const ROLE_LABEL = { owner: 'Владелец', admin: 'Администратор', member: 'Участник' } as const;
+
+const DATIVE_MONTHS = ['январю', 'февралю', 'марту', 'апрелю', 'маю', 'июню', 'июлю', 'августу', 'сентябрю', 'октябрю', 'ноябрю', 'декабрю'];
+
+export function monthDative(offset = 0): string {
+  const now = new Date();
+  return DATIVE_MONTHS[new Date(now.getFullYear(), now.getMonth() + offset, 1).getMonth()];
+}
+
+export function capitalize(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+// Сравнивать неполный месяц с полным прошлым нечестно: в начале месяца всё «снизилось»
+export function samePeriodRange(offset = -1): { date_from: string; date_to: string } {
+  const now = new Date();
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + offset + 1, 0).getDate();
+  return {
+    date_from: isoDate(new Date(now.getFullYear(), now.getMonth() + offset, 1)),
+    date_to: isoDate(new Date(now.getFullYear(), now.getMonth() + offset, Math.min(now.getDate(), lastDay))),
+  };
+}
+
+export function changePercent(current: number, previous: number): number | null {
+  if (previous <= 0) return null;
+  return Math.round(((current - previous) / previous) * 100);
+}
+
+export function signedPercent(value: number): string {
+  return `${value > 0 ? '+' : value < 0 ? '−' : ''}${Math.abs(value)}%`;
+}
+
+export function signedMoney(value: number, currency = 'RUB'): string {
+  return `${value > 0 ? '+' : value < 0 ? '−' : ''}${money(Math.abs(value), currency)}`;
+}
+
+const EMOJI: [RegExp, string][] = [
+  [/продукт/i, '🛒'], [/жиль|жкх|дом|ремонт/i, '🏠'], [/транспорт|такси/i, '🚕'], [/кафе|ресторан/i, '☕'],
+  [/связь|интернет/i, '📱'], [/здоров/i, '💊'], [/развлеч/i, '🎬'], [/одежд/i, '👕'], [/красот/i, '💅'],
+  [/подписк/i, '🔁'], [/техник/i, '💻'], [/путешеств/i, '✈️'], [/обучен/i, '📚'], [/зарплат/i, '💼'],
+  [/кешб|процент/i, '💰'], [/подар/i, '🎁'],
+];
+
+export function categoryEmoji(name: string | undefined, type: 'income' | 'expense' | 'transfer'): string {
+  if (type === 'transfer') return '🔄';
+  return EMOJI.find(([pattern]) => pattern.test(name ?? ''))?.[1] ?? (type === 'income' ? '💵' : '🧾');
+}

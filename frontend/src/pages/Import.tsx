@@ -35,7 +35,7 @@ export function ImportPage() {
 
   return (
     <div className="prototype-page">
-      <PageHeading eyebrow="Данные" title="Импорт операций" subtitle="Загрузите Excel или CSV: сначала проверка, потом запись." />
+      <PageHeading eyebrow="Деньги под контролем" title="Импорт операций" subtitle="Загрузите Excel или CSV: сначала проверка, потом запись." />
       <section className="card plain-card">
         <h3>Файл</h3>
         <p className="columns-hint">

@@ -5,15 +5,12 @@
 .auth-card p.hint{margin:14px 0 0;color:var(--muted);font-size:13px;text-align:center}
 .auth-card a,.text-link{color:var(--mint-dark);font-weight:700}
 .modal .type-switch.three{grid-template-columns:repeat(3,1fr)}
-.type-switch button.selected{background:var(--mint-dark)}
 .form-error{margin:0;padding:10px 12px;border-radius:10px;color:#a32638;background:#ffe9ec;font-size:13px}
 .form-ok{margin:0;padding:10px 12px;border-radius:10px;color:#116b52;background:#e2f7f0;font-size:13px}
 .state{padding:40px 20px;color:var(--muted);text-align:center;font-size:14px}
 .filterbar{flex-wrap:wrap}
 .filterbar select,.filterbar input[type=date]{padding:9px 10px;border:1px solid var(--line);border-radius:10px;color:var(--ink);background:var(--surface);font-size:13px}
-.link-button{padding:0;border:0;color:inherit;background:none;font:inherit;font-weight:700;text-align:left;cursor:pointer}
-.link-button:hover{text-decoration:underline}
-.family-chip select{min-width:0;flex:1;border:0;color:inherit;background:transparent;font:inherit;outline:0}
+.family-chip select{min-width:0;flex:1;border:0;color:inherit;background:transparent;font:inherit;outline:0;appearance:none;cursor:pointer}
 .family-chip select option{color:#152238}
 .nav-list a,.sidebar-bottom a{text-decoration:none}
 .row-actions{display:flex;gap:6px;flex-wrap:wrap}
@@ -55,4 +52,37 @@
   .transaction-table .table-row>:nth-child(4){grid-area:account;text-align:right}
   .transaction-table .table-row>:nth-child(5){grid-area:amount}
   .transaction-table .table-row>:nth-child(6){grid-area:del}
+}
+
+.avatar{text-decoration:none}
+.profile-mini button{padding:0;border:0;color:#8ca0b0;background:transparent;cursor:pointer}
+.card-title select{padding:7px 9px;border:1px solid var(--line);border-radius:9px;color:var(--muted);background:var(--surface);font-size:11px}
+.smart-card a{margin-top:auto;color:#fff;display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;text-decoration:none}
+.filter-panel{padding:0 14px 14px;display:flex;flex-wrap:wrap;gap:8px}
+.filter-panel select,.filter-panel input{padding:9px 10px;border:1px solid var(--line);border-radius:10px;color:var(--ink);background:var(--surface);font-size:13px}
+.filterbar select{font-size:12px}
+.account-head button,.group-head>button{padding:0;border:0;color:var(--muted);background:transparent;cursor:pointer}
+.budget-item.editable{display:block;width:100%;padding:12px 0;border:0;border-bottom:1px solid var(--line);background:transparent;color:inherit;text-align:left;cursor:pointer}
+.budget-item.archived b{color:var(--muted);text-decoration:line-through}
+.modal .danger-button{padding:11px;border:1px solid #f3c7cd;border-radius:11px;color:#b3263a;background:#fff;font-size:13px;font-weight:700;cursor:pointer}
+.modal .check-line{display:flex;align-items:center;gap:8px}
+.modal .check-line input{width:auto}
+.reconcile-line{padding:10px 0;display:grid;grid-template-columns:1fr 130px;align-items:center;gap:10px;border-bottom:1px solid var(--line);font-size:13px}
+.reconcile-line small{display:block;margin-top:3px;color:var(--muted)}
+.reconcile-line .diff{grid-column:span 2;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.member-row select{padding:5px 8px;border:1px solid var(--line);border-radius:99px;color:var(--mint-dark);background:var(--surface);font-size:11px}
+.member-row{grid-template-columns:38px 1fr auto auto}
+.member-row button{cursor:pointer;font-size:12px}
+.member-row b{font-size:14px}.member-row small{font-size:12px}.member-row em{font-size:11px}
+.invite-row{font-size:13px;cursor:pointer}
+.permissions-card li{font-size:13px}
+.family-hero p{font-size:12px}.family-hero span,.family-hero small{font-size:12px}
+.settings-form label{font-size:12px}
+.settings-panel-title{margin:0 0 4px;font-size:17px}
+.settings-note{margin:0;color:var(--muted);font-size:13px}
+.page-stack>*,.family-grid>*{min-width:0}
+@media(max-width:640px){
+  .member-row{grid-template-columns:38px 1fr}
+  .member-row em,.member-row select,.member-row button{grid-column:2;justify-self:start}
+  .member-row>i{display:none}
 }

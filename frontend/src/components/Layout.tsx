@@ -1,6 +1,7 @@
-import { CreditCard, LayoutDashboard, LineChart, LogOut, Menu, Palette, Plus, ReceiptText, Settings, Shield, Upload, Users, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { Bell, CreditCard, LayoutDashboard, LineChart, LogOut, Menu, Palette, Plus, ReceiptText, Search, Settings, Shield, Users, X, ChevronDown } from 'lucide-react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { Link, NavLink, Outlet, useLocation, useNavigate, useOutletContext } from 'react-router-dom';
+import type { TxType } from '../api/types';
 import { useAuth } from '../auth';
 import { initials } from '../lib/format';
 import { useLedger } from '../ledger';
@@ -8,11 +9,10 @@ import { TransactionModal } from './TransactionModal';
 
 const NAV = [
   { to: '/', label: 'Обзор', icon: LayoutDashboard },
-  { to: '/transactions', label: 'Операции', icon: ReceiptText },
+  { to: '/transactions', label: 'Транзакции', icon: ReceiptText },
   { to: '/analytics', label: 'Аналитика', icon: LineChart },
   { to: '/accounts', label: 'Счета', icon: CreditCard },
   { to: '/categories', label: 'Категории', icon: Palette },
-  { to: '/import', label: 'Импорт', icon: Upload },
   { to: '/family', label: 'Семья', icon: Users },
 ];
 
@@ -26,27 +26,56 @@ function storedTheme() {
   }
 }
 
+export interface AddPreset {
+  type?: TxType;
+  account_id?: number;
+}
+
+export function useAddOperation() {
+  return useOutletContext<{ openAdd: (preset?: AddPreset) => void }>().openAdd;
+}
+
 export function Layout() {
   const { user, logout } = useAuth();
   const { ledgers, ledger, select } = useLedger();
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState<AddPreset | null>(null);
   const [theme, setTheme] = useState(storedTheme);
+  const [search, setSearch] = useState('');
+  const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     // Тему меняет страница настроек, а применяется она здесь, на корневом элементе
     const listener = (event: Event) => setTheme((event as CustomEvent<string>).detail);
     window.addEventListener(THEME_KEY, listener);
-    return () => window.removeEventListener(THEME_KEY, listener);
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
+        event.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener(THEME_KEY, listener);
+      window.removeEventListener('keydown', onKey);
+    };
   }, []);
 
   const closeMenu = () => setMenuOpen(false);
   const link = ({ isActive }: { isActive: boolean }) => (isActive ? 'active' : '');
 
+  function submitSearch(event: FormEvent) {
+    event.preventDefault();
+    navigate(`/transactions?search=${encodeURIComponent(search.trim())}`);
+    setSearch('');
+  }
+
   return (
     <main className="app-shell" data-theme={theme}>
       <aside className={`sidebar ${menuOpen ? 'sidebar-open' : ''}`}>
-        <div className="brand"><span className="brand-mark">W</span><span>Walletly</span></div>
+        <div className="brand"><img className="brand-mark" src="/brand/walletly-mark.svg" alt="" /><span>Walletly</span></div>
         <button className="mobile-close" onClick={closeMenu} aria-label="Закрыть меню"><X /></button>
         <nav className="nav-list" aria-label="Основная навигация">
           {NAV.map(({ to, label, icon: Icon }) => (
@@ -65,12 +94,14 @@ export function Layout() {
           <select aria-label="Текущее пространство" value={ledger.id} onChange={(e) => select(Number(e.target.value))}>
             {ledgers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
+          <ChevronDown size={16} />
         </label>
         <div className="sidebar-bottom">
           <NavLink to="/settings" className={link} onClick={closeMenu}><Settings size={19} />Настройки</NavLink>
           <div className="profile-mini">
             <span>{initials(user?.name ?? '')}</span>
-            <div><b>{user?.name}</b><small>{user?.email}</small></div>
+            <div><b>{user?.name}</b><small>{user?.plan === 'premium' ? 'Premium' : 'Free'}</small></div>
+            <button onClick={logout} aria-label="Выйти" title="Выйти"><LogOut size={16} /></button>
           </div>
         </div>
       </aside>
@@ -79,14 +110,25 @@ export function Layout() {
       <section className="workspace">
         <header className="topbar">
           <button className="menu-button" onClick={() => setMenuOpen(true)} aria-label="Открыть меню"><Menu /></button>
-          <div className="top-actions" style={{ marginLeft: 'auto' }}>
-            <button className="primary-button" onClick={() => setAdding(true)}><Plus size={18} />Операция</button>
-            <button className="icon-button" onClick={logout} aria-label="Выйти" title="Выйти"><LogOut size={20} /></button>
+          <form className="search" onSubmit={submitSearch} role="search">
+            <Search size={18} />
+            <input ref={searchRef} aria-label="Поиск" placeholder="Найти транзакцию" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <kbd>⌘ K</kbd>
+          </form>
+          <div className="top-actions">
+            <button className="icon-button" aria-label="Уведомления" title="Уведомлений нет"><Bell size={20} /></button>
+            <Link className="avatar" to="/settings" aria-label="Профиль">{initials(user?.name ?? '')}</Link>
           </div>
         </header>
-        <div className="content"><Outlet /></div>
+        <div className="content"><Outlet context={{ openAdd: (preset: AddPreset = {}) => setAdding(preset) }} /></div>
+        <nav className="mobile-nav" aria-label="Мобильная навигация">
+          {NAV.slice(0, 4).map(({ to, label, icon: Icon }) => (
+            <button key={to} className={pathname === to ? 'active' : ''} onClick={() => navigate(to)}><Icon size={20} /><span>{label}</span></button>
+          ))}
+          <button onClick={() => setAdding({})}><span className="mobile-add"><Plus /></span><span>Добавить</span></button>
+        </nav>
       </section>
-      {adding && <TransactionModal onClose={() => setAdding(false)} />}
+      {adding && <TransactionModal preset={adding} onClose={() => setAdding(null)} />}
     </main>
   );
 }

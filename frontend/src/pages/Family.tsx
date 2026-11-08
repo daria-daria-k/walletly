@@ -1,11 +1,12 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { UserPlus } from 'lucide-react';
+import { Check, ShieldCheck, UserPlus } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { api, errorText } from '../api/client';
-import type { Invitation, Ledger, Member } from '../api/types';
+import type { AuthorTotal, Invitation, Ledger, Member, Summary } from '../api/types';
 import { useAuth } from '../auth';
-import { ErrorNote, PageHeading } from '../components/ui';
-import { initials, ROLE_LABEL, shortDate } from '../lib/format';
+import { ErrorNote, Modal, PageHeading } from '../components/ui';
+import { useAccounts } from '../lib/data';
+import { initials, money, monthRange, monthTitle, ROLE_LABEL, shortDate } from '../lib/format';
 import { useLedger } from '../ledger';
 
 function CreateSpace() {
@@ -40,15 +41,47 @@ function CreateSpace() {
   );
 }
 
-function SharedSpace() {
-  const { user } = useAuth();
-  const { base, ledger, canManage } = useLedger();
+function InviteModal({ onClose }: { onClose: () => void }) {
+  const { base } = useLedger();
   const queryClient = useQueryClient();
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
 
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setError(null);
+    try {
+      await api(`${base}/invitations`, { method: 'POST', body: { email } });
+      await queryClient.invalidateQueries({ queryKey: [base] });
+      onClose();
+    } catch (err) {
+      setError(errorText(err));
+    }
+  }
+
+  return (
+    <Modal eyebrow="Семья" title="Пригласить участника" onClose={onClose}>
+      <form onSubmit={submit} style={{ marginTop: 16 }}>
+        <label>Email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus /></label>
+        <ErrorNote text={error} />
+        <button className="primary-button submit">Создать ссылку</button>
+      </form>
+    </Modal>
+  );
+}
+
+function SharedSpace({ inviting, onCloseInvite, onInvite }: { inviting: boolean; onCloseInvite: () => void; onInvite: () => void }) {
+  const { user } = useAuth();
+  const { base, ledger, canManage } = useLedger();
+  const queryClient = useQueryClient();
+  const [error, setError] = useState<string | null>(null);
+  const range = monthRange();
+
+  const { data: accounts = [] } = useAccounts();
   const { data: members = [] } = useQuery({ queryKey: [base, 'members'], queryFn: () => api<Member[]>(`${base}/members`) });
   const { data: invitations = [] } = useQuery({ queryKey: [base, 'invitations'], queryFn: () => api<Invitation[]>(`${base}/invitations`), enabled: canManage });
+  const { data: summary } = useQuery({ queryKey: [base, 'summary', range], queryFn: () => api<Summary>(`${base}/analytics/summary`, { query: range }) });
+  const { data: authors = [] } = useQuery({ queryKey: [base, 'by-author', range], queryFn: () => api<AuthorTotal[]>(`${base}/analytics/by-author`, { query: range }) });
 
   async function run(action: () => Promise<unknown>, afterLedgers = false) {
     setError(null);
@@ -60,76 +93,81 @@ function SharedSpace() {
     }
   }
 
-  async function invite(event: FormEvent) {
-    event.preventDefault();
-    await run(() => api(`${base}/invitations`, { method: 'POST', body: { email } }));
-    setEmail('');
-  }
-
   const inviteLink = (token: string) => `${window.location.origin}/invite/${token}`;
   const isOwner = ledger.role === 'owner';
+  const balance = accounts.filter((a) => a.currency === 'RUB').reduce((sum, a) => sum + Number(a.balance), 0);
+  const expense = Number(summary?.expense ?? 0);
+  const split = authors.map((a) => `${a.name} — ${Math.round((Number(a.total) / expense) * 100)}%`).join(' · ');
+  const pending = invitations.filter((i) => i.status === 'pending');
 
   return (
     <>
-      <section className="card members-card">
-        <div className="section-head"><div><h3>Участники</h3><p>{members.length} чел.</p></div></div>
-        {members.map((member) => (
-          <div className="member-row" key={member.user_id}>
-            <span>{initials(member.name)}</span>
-            <div><b>{member.name}</b><small>{member.email}</small></div>
-            {isOwner && member.role !== 'owner' ? (
-              <select aria-label={`Роль: ${member.name}`} value={member.role} onChange={(e) => run(() => api(`${base}/members/${member.user_id}`, { method: 'PATCH', body: { role: e.target.value } }))}>
-                <option value="member">Участник</option><option value="admin">Администратор</option>
-              </select>
-            ) : <em>{ROLE_LABEL[member.role]}</em>}
-            {member.role !== 'owner' && (canManage || member.user_id === user?.id) ? (
-              <button className="small-button danger" onClick={() => window.confirm(member.user_id === user?.id ? 'Выйти из пространства?' : `Исключить ${member.name}?`) && run(() => api(`${base}/members/${member.user_id}`, { method: 'DELETE' }), member.user_id === user?.id)}>
-                {member.user_id === user?.id ? 'Выйти' : 'Исключить'}
-              </button>
-            ) : <span />}
-          </div>
-        ))}
-      </section>
+      <div className="family-hero card">
+        <div><p>Общий баланс</p><h2>{money(balance)}</h2><span>Активных счетов: {accounts.length}</span></div>
+        <div className="family-split"><p>Расходы, {monthTitle().split(' ')[0]}</p><b>{money(expense)}</b><small>{split || 'Расходов пока нет'}</small></div>
+      </div>
       <ErrorNote text={error} />
-      {canManage && (
-        <section className="card plain-card">
-          <h3><UserPlus size={17} style={{ display: 'inline', marginRight: 6 }} />Пригласить</h3>
-          <p>Письма пока не отправляются: скопируйте ссылку и пришлите её человеку. Принять сможет только аккаунт с этим email.</p>
-          <form className="inline-form" onSubmit={invite}>
-            <input type="email" aria-label="Email приглашённого" placeholder="email@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
-            <button className="primary-button">Создать ссылку</button>
-          </form>
-          <div style={{ marginTop: 12 }}>
-            {invitations.filter((i) => i.status === 'pending').map((invitation) => (
-              <div className="invite-line" key={invitation.id}>
-                <div><b>{invitation.email}</b><small>до {shortDate(invitation.expires_at.slice(0, 10))}</small></div>
-                <code>{inviteLink(invitation.token)}</code>
-                <div className="row-actions">
-                  <button className="small-button" onClick={() => navigator.clipboard.writeText(inviteLink(invitation.token))}>Копировать</button>
-                  <button className="small-button danger" onClick={() => run(() => api(`${base}/invitations/${invitation.id}`, { method: 'DELETE' }))}>Отозвать</button>
-                </div>
+      <div className="family-grid">
+        <section className="card members-card">
+          <div className="section-head"><div><h3>Участники</h3><p>Человек: {members.length}</p></div></div>
+          {members.map((member) => (
+            <div className="member-row" key={member.user_id}>
+              <span>{initials(member.name)}</span>
+              <div><b>{member.name}</b><small>{member.email}</small></div>
+              {isOwner && member.role !== 'owner' ? (
+                <select aria-label={`Роль: ${member.name}`} value={member.role} onChange={(e) => run(() => api(`${base}/members/${member.user_id}`, { method: 'PATCH', body: { role: e.target.value } }))}>
+                  <option value="member">Участник</option><option value="admin">Администратор</option>
+                </select>
+              ) : <em>{ROLE_LABEL[member.role]}</em>}
+              {member.role !== 'owner' && (canManage || member.user_id === user?.id) ? (
+                <button className="small-button danger" onClick={() => window.confirm(member.user_id === user?.id ? 'Выйти из пространства?' : `Исключить ${member.name}?`) && run(() => api(`${base}/members/${member.user_id}`, { method: 'DELETE' }), member.user_id === user?.id)}>
+                  {member.user_id === user?.id ? 'Выйти' : 'Исключить'}
+                </button>
+              ) : <i />}
+            </div>
+          ))}
+          {canManage && <button className="invite-row" onClick={onInvite}><UserPlus size={17} />Пригласить участника по email</button>}
+          {pending.map((invitation) => (
+            <div className="invite-line" key={invitation.id}>
+              <div><b>{invitation.email}</b><small>до {shortDate(invitation.expires_at.slice(0, 10))}</small></div>
+              <code>{inviteLink(invitation.token)}</code>
+              <div className="row-actions">
+                <button className="small-button" onClick={() => navigator.clipboard.writeText(inviteLink(invitation.token))}>Копировать</button>
+                <button className="small-button danger" onClick={() => run(() => api(`${base}/invitations/${invitation.id}`, { method: 'DELETE' }))}>Отозвать</button>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </section>
-      )}
-      {isOwner && (
-        <section className="card plain-card">
-          <h3>Удаление</h3>
-          <p>Удалятся все счета, категории и операции этого пространства. Отменить нельзя.</p>
-          <button className="small-button danger" onClick={() => window.confirm(`Удалить «${ledger.name}» со всеми данными?`) && run(() => api(base, { method: 'DELETE' }), true)}>Удалить пространство</button>
+        <section className="card permissions-card">
+          <span className="reconcile-icon"><ShieldCheck /></span>
+          <h3>Права доступа</h3>
+          <p>Участники видят общие счета и операции. Данные личного пространства остаются приватными.</p>
+          <ul>
+            <li><Check />Общие операции</li>
+            <li><Check />Категории и лимиты</li>
+            <li><Check />Совместная аналитика</li>
+          </ul>
+          {isOwner && <button className="small-button danger" onClick={() => window.confirm(`Удалить «${ledger.name}» со всеми данными? Это нельзя отменить.`) && run(() => api(base, { method: 'DELETE' }), true)}>Удалить пространство</button>}
         </section>
-      )}
+      </div>
+      {inviting && <InviteModal onClose={onCloseInvite} />}
     </>
   );
 }
 
 export function FamilyPage() {
-  const { ledger } = useLedger();
+  const { ledger, canManage } = useLedger();
+  const [inviting, setInviting] = useState(false);
+  const shared = ledger.type === 'shared';
   return (
     <div className="prototype-page page-stack">
-      <PageHeading eyebrow="Совместный учёт" title={ledger.type === 'shared' ? ledger.name : 'Семья'} subtitle={ledger.type === 'shared' ? 'Общие операции видны всем участникам.' : 'Сейчас открыто личное пространство: его данные видите только вы.'} />
-      {ledger.type === 'shared' && <SharedSpace />}
+      <PageHeading
+        eyebrow="Совместный бюджет"
+        title={shared ? ledger.name : 'Семья'}
+        subtitle={shared ? 'Общие расходы видны всем участникам группы.' : 'Сейчас открыто личное пространство: его данные видите только вы.'}
+        action={shared && canManage ? <button className="primary-button" onClick={() => setInviting(true)}><UserPlus size={18} />Пригласить</button> : undefined}
+      />
+      {shared && <SharedSpace inviting={inviting} onInvite={() => setInviting(true)} onCloseInvite={() => setInviting(false)} />}
       <CreateSpace />
     </div>
   );

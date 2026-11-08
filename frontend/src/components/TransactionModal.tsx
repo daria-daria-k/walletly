@@ -12,15 +12,17 @@ const TYPES: { value: TxType; label: string }[] = [
   { value: 'transfer', label: 'Перевод' },
 ];
 
-export function TransactionModal({ transaction, onClose }: { transaction?: Transaction; onClose: () => void }) {
+const SUBMIT_LABEL = { expense: 'Добавить расход', income: 'Добавить доход', transfer: 'Добавить перевод' };
+
+export function TransactionModal({ transaction, preset, onClose }: { transaction?: Transaction; preset?: { type?: TxType; account_id?: number }; onClose: () => void }) {
   const { base } = useLedger();
   const { data: accounts = [] } = useAccounts();
   const { data: groups = [] } = useCategoryGroups();
   const refresh = useRefreshLedgerData();
 
-  const [type, setType] = useState<TxType>(transaction?.type ?? 'expense');
+  const [type, setType] = useState<TxType>(transaction?.type ?? preset?.type ?? 'expense');
   const [amount, setAmount] = useState(transaction?.amount ?? '');
-  const [accountId, setAccountId] = useState(String(transaction?.account_id ?? ''));
+  const [accountId, setAccountId] = useState(String(transaction?.account_id ?? preset?.account_id ?? ''));
   const [toAccountId, setToAccountId] = useState(String(transaction?.to_account_id ?? ''));
   const [categoryId, setCategoryId] = useState(String(transaction?.category_id ?? ''));
   const [description, setDescription] = useState(transaction?.description ?? '');
@@ -30,6 +32,7 @@ export function TransactionModal({ transaction, onClose }: { transaction?: Trans
 
   const visibleGroups = groups.filter((group) => group.type === type);
   const effectiveAccount = accountId || String(accounts[0]?.id ?? '');
+  const currency = accounts.find((a) => String(a.id) === effectiveAccount)?.currency ?? 'RUB';
 
   function changeType(next: TxType) {
     setType(next);
@@ -60,6 +63,17 @@ export function TransactionModal({ transaction, onClose }: { transaction?: Trans
     }
   }
 
+  async function remove() {
+    if (!transaction || !window.confirm('Удалить операцию?')) return;
+    try {
+      await api(`${base}/transactions/${transaction.id}`, { method: 'DELETE' });
+      await refresh();
+      onClose();
+    } catch (err) {
+      setError(errorText(err));
+    }
+  }
+
   return (
     <Modal eyebrow={transaction ? 'Редактирование' : 'Новая запись'} title={transaction ? 'Изменить операцию' : 'Добавить операцию'} onClose={onClose}>
       <div className="type-switch three">
@@ -72,7 +86,10 @@ export function TransactionModal({ transaction, onClose }: { transaction?: Trans
       <form onSubmit={submit}>
         <label>
           Сумма
-          <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" required autoFocus />
+          <div className="amount-input">
+            <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" required autoFocus />
+            <span>{currency === 'RUB' ? '₽' : currency}</span>
+          </div>
         </label>
         <div className="form-grid">
           <label>
@@ -113,8 +130,9 @@ export function TransactionModal({ transaction, onClose }: { transaction?: Trans
         </label>
         <ErrorNote text={accounts.length === 0 ? 'Сначала добавьте счёт на странице «Счета»' : error} />
         <button className="primary-button submit" type="submit" disabled={saving || accounts.length === 0}>
-          {saving ? 'Сохраняем…' : 'Сохранить'}
+          {saving ? 'Сохраняем…' : transaction ? 'Сохранить' : SUBMIT_LABEL[type]}
         </button>
+        {transaction && <button type="button" className="danger-button" onClick={remove}>Удалить операцию</button>}
       </form>
     </Modal>
   );
