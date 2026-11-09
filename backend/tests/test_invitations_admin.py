@@ -160,9 +160,48 @@ async def test_plan_change_and_stats(
     )
     assert response.json()["plan"] == "premium"
     stats = (await client.get("/api/admin/stats", headers=anna.headers)).json()
-    assert stats == {
-        "users_total": 2,
-        "users_active": 2,
-        "users_premium": 1,
-        "transactions_total": 0,
-    }
+    assert (stats["users_total"], stats["users_active"], stats["users_premium"]) == (2, 2, 1)
+    assert stats["transactions_total"] == 0
+
+
+@pytest.fixture
+async def root(register: RegisterFn, session: AsyncSession) -> AuthedUser:
+    user = await register("root@example.com", "Админ")
+    await session.execute(update(User).where(User.id == user.id).values(role=UserRole.ADMIN))
+    await session.commit()
+    return user
+
+
+async def test_admin_changes_are_audited(
+    client: AsyncClient, root: AuthedUser, anna: AuthedUser
+) -> None:
+    url = f"/api/admin/users/{anna.id}"
+    await client.patch(url, json={"is_active": False}, headers=root.headers)
+    await client.patch(url, json={"is_active": False}, headers=root.headers)  # без изменений
+    await client.patch(url, json={"plan": "premium"}, headers=root.headers)
+
+    entries = (await client.get("/api/admin/audit", headers=root.headers)).json()
+    assert [(e["action"], e["detail"]) for e in entries] == [
+        ("plan", "premium"),
+        ("status", "Заблокирован"),
+    ]
+    assert entries[0]["actor_email"] == "root@example.com"
+    assert entries[0]["target_email"] == "anna@example.com"
+
+
+async def test_audit_is_admin_only(client: AsyncClient, anna: AuthedUser) -> None:
+    assert (await client.get("/api/admin/audit", headers=anna.headers)).status_code == 403
+
+
+async def test_filter_users_by_plan(client: AsyncClient, root: AuthedUser, anna: AuthedUser) -> None:
+    await client.patch(f"/api/admin/users/{anna.id}", json={"plan": "premium"}, headers=root.headers)
+    page = await client.get("/api/admin/users", params={"plan": "premium"}, headers=root.headers)
+    assert [item["email"] for item in page.json()["items"]] == ["anna@example.com"]
+    assert page.json()["total"] == 1
+
+
+async def test_stats_has_eight_weeks(client: AsyncClient, root: AuthedUser, anna: AuthedUser) -> None:
+    stats = (await client.get("/api/admin/stats", headers=root.headers)).json()
+    assert stats["users_new_30d"] == 2
+    assert len(stats["registrations"]) == 8
+    assert stats["registrations"][-1]["count"] == 2

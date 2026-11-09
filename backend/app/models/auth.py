@@ -18,3 +18,17 @@ class RefreshToken(Base):
     # None — токен действует; дата — когда отозван (ротация, выход, подозрение на кражу)
     revoked_at: Mapped[datetime | None]
     created_at: Mapped[CreatedAt]
+
+
+class AdminAuditEntry(Base):
+    """Журнал действий администраторов. API только дописывает записи и читает их."""
+
+    __tablename__ = "admin_audit_log"
+
+    id: Mapped[IntPK]
+    # Email, а не внешний ключ: запись должна пережить удаление любого из пользователей
+    actor_email: Mapped[str] = mapped_column(String(255))
+    target_email: Mapped[str] = mapped_column(String(255))
+    action: Mapped[str] = mapped_column(String(30))
+    detail: Mapped[str] = mapped_column(String(100))
+    created_at: Mapped[CreatedAt]
