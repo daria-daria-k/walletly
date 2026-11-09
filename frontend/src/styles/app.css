@@ -190,3 +190,19 @@
 .goal-history>div{padding:8px 0;display:flex;align-items:center;gap:10px;font-size:13px}
 .goal-history span{flex:1;color:var(--muted)}
 .goal-history button{border:0;background:transparent;color:var(--muted);font-size:18px;cursor:pointer}
+
+.notif{position:relative}
+.notif-button{position:relative}
+.notif-button i{position:absolute;top:-4px;right:-4px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:var(--coral);color:#fff;font-size:10px;font-style:normal;line-height:17px;text-align:center}
+.notif-panel{position:absolute;top:calc(100% + 10px);right:0;z-index:60;width:min(340px,calc(100vw - 32px));max-height:420px;overflow-y:auto;padding:8px}
+.notif-panel header{padding:8px 10px;display:flex;justify-content:space-between;align-items:center}
+.notif-panel header button{border:0;background:transparent;color:var(--purple);font-size:12px;font-weight:700;cursor:pointer}
+.notif-panel>p{margin:0;padding:18px 10px;color:var(--muted);font-size:13px;text-align:center}
+.notif-item{width:100%;padding:10px;border:0;border-radius:10px;background:transparent;display:grid;gap:3px;text-align:left;cursor:pointer}
+.notif-item:hover{background:var(--canvas)}
+.notif-item b{font-size:13px;font-weight:600}
+.notif-item.unread b{font-weight:800}
+.notif-item.unread{box-shadow:inset 3px 0 0 var(--purple)}
+.notif-item span,.notif-item small{color:var(--muted);font-size:12px}
+.notif-item small{font-size:11px}
+@media(max-width:640px){.notif-button{display:grid;place-items:center}.notif-panel{position:fixed;top:66px;right:16px}}

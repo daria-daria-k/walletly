@@ -24,6 +24,8 @@ export interface AdminUser { id: number; email: string; name: string; role: 'use
 
 export interface Goal { id: number; ledger_id: number; name: string; target_amount: string; monthly_contribution: string; account_id: number; account_name: string; currency: string; reminder_day: number; saved: string; remaining: string; progress_percent: number; months_left: number; forecast_month: string | null; contributed_this_month: boolean; missed_last_month: boolean; reminder_due: boolean }
 export interface ContributionItem { id: number; user_name: string; amount: string; contributed_on: string; from_transfer: boolean; created_at: string }
+export interface NotificationItem { id: number; kind: string; title: string; body: string; link: string; read_at: string | null; created_at: string }
+export interface NotificationList { items: NotificationItem[]; unread: number }
 export interface ImportBatch { id: number; filename: string; total_rows: number; created: number; skipped_duplicates: number; errors: number; created_at: string }
 export interface AuditEntry { id: number; actor_email: string; target_email: string; action: string; detail: string; created_at: string }
 export interface Insights {

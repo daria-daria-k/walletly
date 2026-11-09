@@ -172,7 +172,7 @@ export function SettingsPage() {
               ))}
             </div>
             <ErrorNote text={notifyError} />
-            <p className="settings-note" style={{ marginTop: 14 }}>Выбор сохраняется. Сами уведомления начнут приходить, когда появится их доставка.</p>
+            <p className="settings-note" style={{ marginTop: 14 }}>Уведомления появляются в колокольчике, недельная сводка приходит ещё и на почту.</p>
           </section>
         )}
 

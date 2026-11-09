@@ -1,10 +1,11 @@
-import { Bell, BrainCircuit, CreditCard, FileUp, LayoutDashboard, LineChart, LogOut, Menu, Palette, PiggyBank, Plus, ReceiptText, Search, Settings, ShieldCheck, Users, X } from 'lucide-react';
+import { BrainCircuit, CreditCard, FileUp, LayoutDashboard, LineChart, LogOut, Menu, Palette, PiggyBank, Plus, ReceiptText, Search, Settings, ShieldCheck, Users, X } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 import type { TxType } from '../api/types';
 import { useAuth } from '../auth';
 import { initials } from '../lib/format';
 import { useLedger } from '../ledger';
+import { NotificationBell } from './NotificationBell';
 import { StyledSelect } from './StyledSelect';
 import { TransactionModal } from './TransactionModal';
 
@@ -132,7 +133,7 @@ export function Layout() {
             <kbd>⌘ K</kbd>
           </form>
           <div className="top-actions">
-            <button className="icon-button" aria-label="Уведомления" title="Уведомлений нет"><Bell size={20} /></button>
+            <NotificationBell />
             <Link className="avatar" to="/settings" aria-label="Профиль">{initials(user?.name ?? '')}</Link>
           </div>
         </header>

@@ -16,6 +16,7 @@ from app.api.routers import (
     imports,
     invitations,
     ledgers,
+    notifications,
     transactions,
 )
 from app.core.database import engine
@@ -67,6 +68,7 @@ for module in (
     exports,
     invitations,
     admin,
+    notifications,
 ):
     api.include_router(module.router)
 app.include_router(api)

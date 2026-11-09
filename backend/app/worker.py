@@ -10,7 +10,9 @@ import logging
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.core.database import SessionLocal
+from app.services import mailer
 from app.services.auth import delete_stale_tokens
+from app.services.notification import delete_old, run_checks
 
 logger = logging.getLogger("walletly.worker")
 
@@ -21,9 +23,26 @@ async def cleanup_tokens() -> None:
     logger.info("Удалено устаревших токенов: %s", deleted)
 
 
+async def check_notifications() -> None:
+    async with SessionLocal() as session:
+        created = await run_checks(session)
+    logger.info("Новых уведомлений: %s", len(created))
+    for item in created:
+        # По почте только недельная сводка: остальное важнее увидеть в приложении, чем в ящике
+        if item.kind == "weekly" and item.user.email_verified_at is not None:
+            await mailer.send_mail(item.user.email, item.title, item.body)
+
+
+async def cleanup_notifications() -> None:
+    async with SessionLocal() as session:
+        await delete_old(session)
+
+
 def build_scheduler() -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler(timezone="UTC")
     scheduler.add_job(cleanup_tokens, "cron", hour=3, minute=0)
+    scheduler.add_job(cleanup_notifications, "cron", hour=3, minute=10)
+    scheduler.add_job(check_notifications, "cron", minute=5)
     return scheduler
 
 

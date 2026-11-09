@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, CreatedAt, IntPK
@@ -34,6 +34,24 @@ class EmailToken(Base):
     token_hash: Mapped[str] = mapped_column(String(64), unique=True)
     expires_at: Mapped[datetime]
     used_at: Mapped[datetime | None]
+    created_at: Mapped[CreatedAt]
+
+
+class Notification(Base):
+    """Запись в колокольчике."""
+
+    __tablename__ = "notifications"
+    # Ключ события: одно и то же событие не должно прийти дважды, сколько ни запускай проверку
+    __table_args__ = (UniqueConstraint("user_id", "dedupe_key", name="uq_notification_event"),)
+
+    id: Mapped[IntPK]
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(20))
+    dedupe_key: Mapped[str] = mapped_column(String(100))
+    title: Mapped[str] = mapped_column(String(200))
+    body: Mapped[str] = mapped_column(Text)
+    link: Mapped[str] = mapped_column(String(200))
+    read_at: Mapped[datetime | None]
     created_at: Mapped[CreatedAt]
 
 
