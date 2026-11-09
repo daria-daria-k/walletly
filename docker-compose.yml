@@ -59,6 +59,19 @@ services:
     depends_on:
       - api
 
+  bot:
+    build: ./backend
+    container_name: walletly-bot
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      REDIS_URL: redis://redis:6379/0
+    command: ["python", "-m", "app.bot"]
+    depends_on:
+      - api
+
   web:
     build: ./frontend
     container_name: walletly-web

@@ -19,6 +19,7 @@ from app.api.routers import (
     ledgers,
     ml,
     notifications,
+    telegram,
     transactions,
 )
 from app.core.database import engine
@@ -73,6 +74,7 @@ for module in (
     notifications,
     billing,
     ml,
+    telegram,
 ):
     api.include_router(module.router)
 app.include_router(api)

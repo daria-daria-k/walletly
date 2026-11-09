@@ -42,6 +42,15 @@ async def hit(key: str, window_seconds: int) -> None:
         logger.exception("Redis недоступен, попытка не посчитана")
 
 
+async def set_value(key: str, value: str, ttl_seconds: int) -> None:
+    await _client.set(key, value, ex=ttl_seconds)
+
+
+async def pop_value(key: str) -> str | None:
+    """GETDEL одной командой: два одновременных запроса не смогут использовать код дважды."""
+    return await _client.getdel(key)
+
+
 async def clear(key: str) -> None:
     try:
         await _client.delete(key)

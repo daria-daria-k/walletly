@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     # Пусто — обучение идёт без записи экспериментов
     mlflow_tracking_uri: str = ""
 
+    # Токен выдаёт @BotFather. Пусто — бот выключен
+    telegram_bot_token: str = ""
+    telegram_bot_username: str = ""
+
     @property
     def database_url(self) -> URL:
         # URL.create сам экранирует спецсимволы в пароле, в отличие от f-строки

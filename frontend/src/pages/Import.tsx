@@ -5,7 +5,7 @@ import { api, downloadFile, errorText } from '../api/client';
 import type { ImportBatch, ImportResult } from '../api/types';
 import { StyledSelect } from '../components/StyledSelect';
 import { ErrorNote, PageHeading, State } from '../components/ui';
-import { useRefreshLedgerData } from '../lib/data';
+import { useAccounts, useRefreshLedgerData } from '../lib/data';
 import { capitalize, dateTime, isoDate, monthRange, monthTitle, plural } from '../lib/format';
 import { useLedger } from '../ledger';
 
@@ -42,6 +42,8 @@ export function ImportPage() {
   const [dragging, setDragging] = useState(false);
   const [period, setPeriod] = useState('0');
   const [exporting, setExporting] = useState(false);
+  const [statementAccount, setStatementAccount] = useState('');
+  const { data: accounts } = useAccounts();
   const [exportError, setExportError] = useState<string | null>(null);
 
   const { data: history = [], refetch: refetchHistory } = useQuery({
@@ -55,7 +57,8 @@ export function ImportPage() {
     const form = new FormData();
     form.append('file', target);
     try {
-      const response = await api<ImportResult>(`${base}/import`, { method: 'POST', form, query: { dry_run: dryRun } });
+      const isPdf = target.name.toLowerCase().endsWith('.pdf');
+      const response = await api<ImportResult>(`${base}/import${isPdf ? '/statement' : ''}`, { method: 'POST', form, query: isPdf ? { dry_run: dryRun, account_id: Number(statementAccount || accounts?.[0]?.id) } : { dry_run: dryRun } });
       setResult(response);
       if (!dryRun) await refresh();
       await refetchHistory();
@@ -108,7 +111,8 @@ export function ImportPage() {
           <div className="section-icon"><Upload /></div>
           <h3>Импорт операций</h3>
           <p>Загрузите Excel или CSV. Сначала Walletly проверит файл, и только потом добавит операции.</p>
-          <input ref={inputRef} hidden aria-label="Файл для импорта" type="file" accept=".xlsx,.csv" onChange={(e) => { choose(e.target.files?.[0]); e.target.value = ''; }} />
+          {Boolean(accounts?.length) && <label className="statement-account">Счёт для PDF-выписки<StyledSelect ariaLabel="Счёт для PDF-выписки" value={statementAccount || String(accounts?.[0]?.id)} onChange={setStatementAccount} options={(accounts ?? []).map((item) => ({ value: String(item.id), label: item.name }))} /></label>}
+          <input ref={inputRef} hidden aria-label="Файл для импорта" type="file" accept=".xlsx,.csv,.pdf" onChange={(e) => { choose(e.target.files?.[0]); e.target.value = ''; }} />
           <button
             className={`upload-zone ${dragging ? 'dragging' : ''}`}
             disabled={busy}

@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, Numeric, String, false, text, true
+from sqlalchemy import BigInteger, ForeignKey, Numeric, String, false, text, true
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -30,6 +30,8 @@ class User(Base):
     )
     # None — адрес не подтверждён. Вход не запрещаем: письмо может задержаться
     email_verified_at: Mapped[datetime | None]
+    # BigInteger: номера чатов Telegram не помещаются в обычный int
+    telegram_chat_id: Mapped[int | None] = mapped_column(BigInteger, unique=True)
     created_at: Mapped[CreatedAt]
 
     subscriptions: Mapped[list["Subscription"]] = relationship(back_populates="user")

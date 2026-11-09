@@ -11,12 +11,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from app.models import Account, Category, ImportBatch, LedgerMember, Transaction
+from app.models import Account, Category, CategoryGroup, ImportBatch, LedgerMember, Transaction
 from app.models.enums import CategoryType, Plan, TransactionType
 from app.schemas.imports import ImportResult, ImportRowError
+from app.services import statement
 from app.services.billing import get_plan
 from app.services.errors import DomainError, InvalidDataError
 from app.services.ml import predict_for_import
+from app.services.scoped import get_in_ledger
 from app.services.transaction import check_fields
 
 MAX_FILE_SIZE = 5 * 1024 * 1024
@@ -158,18 +160,28 @@ class _Lookup:
 
 
 def _predicted_category(
-    description: str, tx_type: TransactionType, lookup: _Lookup, predicted: dict[str, int]
+    description: str,
+    tx_type: TransactionType,
+    lookup: _Lookup,
+    predicted: dict[str, int],
+    fallback: dict[CategoryType, int],
 ) -> Category | None:
-    category = lookup.by_id.get(predicted.get(description, 0))
-    # У перевода категории нет, а доход нельзя отнести к категории расходов
-    wanted = CategoryType.INCOME if tx_type == TransactionType.INCOME else CategoryType.EXPENSE
-    if category is None or tx_type == TransactionType.TRANSFER or category.group.type != wanted:
+    if tx_type == TransactionType.TRANSFER:
         return None
-    return category
+    wanted = CategoryType.INCOME if tx_type == TransactionType.INCOME else CategoryType.EXPENSE
+    category = lookup.by_id.get(predicted.get(description, 0))
+    # Доход нельзя отнести к категории расходов, даже если модель так решила
+    if category is not None and category.group.type == wanted:
+        return category
+    return lookup.by_id.get(fallback.get(wanted, 0))
 
 
 def _build(
-    row: ParsedRow, lookup: _Lookup, member: LedgerMember, predicted: dict[str, int]
+    row: ParsedRow,
+    lookup: _Lookup,
+    member: LedgerMember,
+    predicted: dict[str, int],
+    fallback: dict[CategoryType, int],
 ) -> Transaction:
     values = row.values
     tx_date = _parse_date(values.get("date"))
@@ -192,7 +204,7 @@ def _build(
     category = (
         lookup.category(category_name, tx_type)
         if category_name
-        else _predicted_category(description, tx_type, lookup, predicted)
+        else _predicted_category(description, tx_type, lookup, predicted, fallback)
     )
     check_fields(tx_type, account, to_account, category, check_active=True)
 
@@ -229,7 +241,73 @@ async def import_transactions(
 ) -> ImportResult:
     # Разбор файла — чистая работа CPU, в event loop он остановил бы все запросы
     rows = await run_in_threadpool(_parse_table, content, filename)
+    return await _import_rows(session, member, rows, filename, dry_run=dry_run)
 
+
+async def _fallback_categories(session: AsyncSession, ledger_id: int) -> dict[CategoryType, int]:
+    """Для выписки: в банковском файле нет категорий, а терять строки нельзя."""
+    result: dict[CategoryType, int] = {}
+    names = {CategoryType.EXPENSE: "Прочие расходы", CategoryType.INCOME: "Прочие доходы"}
+    for kind, name in names.items():
+        group = await session.scalar(
+            select(CategoryGroup)
+            .where(CategoryGroup.ledger_id == ledger_id, CategoryGroup.type == kind)
+            .order_by(CategoryGroup.sort_order.desc(), CategoryGroup.id.desc())
+            .limit(1)
+        )
+        if group is None:
+            continue
+        category = await session.scalar(
+            select(Category).where(Category.ledger_id == ledger_id, Category.name == name)
+        )
+        if category is None:
+            category = Category(ledger_id=ledger_id, category_group_id=group.id, name=name)
+            session.add(category)
+            await session.flush()
+        result[kind] = category.id
+    await session.commit()
+    return result
+
+
+async def import_statement(
+    session: AsyncSession,
+    member: LedgerMember,
+    content: bytes,
+    filename: str,
+    account_id: int,
+    *,
+    dry_run: bool,
+) -> ImportResult:
+    account = await get_in_ledger(session, Account, member.ledger_id, account_id)
+    text = await run_in_threadpool(statement.extract_text, content)
+    lines = statement.parse_text(text)
+    if not lines:
+        raise InvalidDataError("В файле не найдено операций. Возможно, это скан или другой формат")
+    rows = [
+        ParsedRow(
+            number,
+            {
+                "date": line.tx_date,
+                "amount": str(line.amount),
+                "account": account.name,
+                "description": line.description,
+            },
+        )
+        for number, line in enumerate(lines, start=1)
+    ]
+    fallback = await _fallback_categories(session, member.ledger_id)
+    return await _import_rows(session, member, rows, filename, dry_run=dry_run, fallback=fallback)
+
+
+async def _import_rows(
+    session: AsyncSession,
+    member: LedgerMember,
+    rows: list[ParsedRow],
+    filename: str,
+    *,
+    dry_run: bool,
+    fallback: dict[CategoryType, int] | None = None,
+) -> ImportResult:
     accounts = await session.scalars(
         select(Account).where(Account.ledger_id == member.ledger_id)
     )
@@ -256,7 +334,7 @@ async def import_transactions(
     errors: list[ImportRowError] = []
     for row in rows:
         try:
-            built.append(_build(row, lookup, member, predicted))
+            built.append(_build(row, lookup, member, predicted, fallback or {}))
         except DomainError as exc:
             errors.append(ImportRowError(row=row.number, message=exc.message))
 

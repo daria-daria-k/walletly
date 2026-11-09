@@ -40,6 +40,37 @@ function currentTheme() {
   }
 }
 
+function TelegramRow() {
+  const queryClient = useQueryClient();
+  const [error, setError] = useState<string | null>(null);
+  const { data } = useQuery({ queryKey: ['telegram-status'], queryFn: () => api<{ configured: boolean; linked: boolean }>('/telegram/status') });
+
+  async function connect() {
+    setError(null);
+    try {
+      const { url } = await api<{ url: string }>('/telegram/link', { method: 'POST' });
+      window.open(url, '_blank', 'noopener');
+    } catch (err) {
+      setError(errorText(err));
+    }
+  }
+
+  async function disconnect() {
+    await api('/telegram/link', { method: 'DELETE' });
+    await queryClient.invalidateQueries({ queryKey: ['telegram-status'] });
+  }
+
+  return (
+    <>
+      <div className="billing-row telegram-row">
+        <div><b>Telegram</b><span>{data?.linked ? 'Подключён: уведомления приходят в чат, расходы можно записывать сообщением.' : data?.configured === false ? 'Бот пока не настроен.' : 'Уведомления и запись расходов сообщением. Тариф Premium.'}</span></div>
+        {data?.linked ? <button className="secondary-button" onClick={disconnect}>Отключить</button> : <button className="secondary-button" disabled={!data?.configured} onClick={connect}>Подключить</button>}
+      </div>
+      <ErrorNote text={error} />
+    </>
+  );
+}
+
 const PAYMENT_STATUS: Record<PaymentItem['status'], string> = { pending: 'Ожидает оплаты', succeeded: 'Оплачен', canceled: 'Отменён' };
 
 function Billing() {
@@ -224,6 +255,7 @@ export function SettingsPage() {
             </div>
             <ErrorNote text={notifyError} />
             <p className="settings-note" style={{ marginTop: 14 }}>Уведомления появляются в колокольчике, недельная сводка приходит ещё и на почту.</p>
+            <TelegramRow />
           </section>
         )}
 

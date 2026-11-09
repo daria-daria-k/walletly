@@ -11,8 +11,10 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.core.database import SessionLocal
 from app.ml.train import train_all
-from app.services import mailer
+from app.models.enums import Plan
+from app.services import mailer, telegram
 from app.services.auth import delete_stale_tokens
+from app.services.billing import get_plan
 from app.services.notification import delete_old, run_checks
 
 logger = logging.getLogger("walletly.worker")
@@ -32,6 +34,11 @@ async def check_notifications() -> None:
         # По почте только недельная сводка: остальное важнее увидеть в приложении, чем в ящике
         if item.kind == "weekly" and item.user.email_verified_at is not None:
             await mailer.send_mail(item.user.email, item.title, item.body)
+        if item.user.telegram_chat_id is not None:
+            async with SessionLocal() as session:
+                plan = await get_plan(session, item.user.id)
+            if plan == Plan.PREMIUM:
+                await telegram.send_message(item.user.telegram_chat_id, f"{item.title}\n{item.body}")
 
 
 async def cleanup_notifications() -> None:
@@ -54,6 +61,8 @@ def build_scheduler() -> AsyncIOScheduler:
 
 async def main() -> None:
     logging.basicConfig(level=logging.INFO)
+    # httpx на уровне INFO печатает адрес запроса, а в адресе секретный токен бота
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     build_scheduler().start()
     logger.info("Планировщик запущен")
     await asyncio.Event().wait()  # работаем, пока процесс не остановят

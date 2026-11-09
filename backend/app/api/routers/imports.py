@@ -2,7 +2,13 @@ from fastapi import APIRouter, HTTPException, UploadFile, status
 
 from app.api.deps import Membership, SessionDep
 from app.schemas.imports import ImportBatchRead, ImportResult
-from app.services.importer import MAX_FILE_SIZE, import_history, import_transactions
+from app.services import billing
+from app.services.importer import (
+    MAX_FILE_SIZE,
+    import_history,
+    import_statement,
+    import_transactions,
+)
 
 router = APIRouter(prefix="/ledgers/{ledger_id}/import", tags=["import"])
 
@@ -19,6 +25,26 @@ async def upload(
     if len(content) > MAX_FILE_SIZE:
         raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Файл больше 5 МБ")
     return await import_transactions(session, member, content, filename, dry_run=dry_run)
+
+
+@router.post("/statement")
+async def upload_statement(
+    file: UploadFile,
+    account_id: int,
+    member: Membership,
+    session: SessionDep,
+    dry_run: bool = False,
+) -> ImportResult:
+    await billing.require_premium(session, member.user_id, "Разбор выписок")
+    filename = file.filename or ""
+    if not filename.lower().endswith(".pdf"):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Нужен файл .pdf")
+    content = await file.read(MAX_FILE_SIZE + 1)
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Файл больше 5 МБ")
+    return await import_statement(
+        session, member, content, filename, account_id, dry_run=dry_run
+    )
 
 
 @router.get("/history")
