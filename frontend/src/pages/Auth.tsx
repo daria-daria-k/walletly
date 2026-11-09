@@ -45,7 +45,7 @@ function AuthScreen({ mode }: { mode: 'login' | 'register' }) {
   }
 
   return (
-    <div className="auth-page" data-theme="violet">
+    <div className="auth-page auth-page-full" data-theme="violet">
       <div className="auth-layout">
         <section className="auth-story">
           <div className="brand"><img className="brand-mark" src="/brand/walletly-mark.svg" alt="" /><span>Walletly</span></div>
