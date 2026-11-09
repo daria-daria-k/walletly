@@ -46,6 +46,19 @@ class ChangePasswordRequest(BaseModel):
     new_password: str = Field(min_length=8, max_length=128)
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: NormalizedEmail
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class VerifyEmailRequest(BaseModel):
+    token: str = Field(max_length=128)
+
+
 class TokenResponse(BaseModel):
     """Access-токен в теле ответа. Refresh сюда не попадает — он уходит в httpOnly cookie."""
 
@@ -66,6 +79,7 @@ class UserRead(BaseModel):
     role: UserRole
     onboarding_completed: bool
     notifications: NotificationSettings
+    email_verified_at: datetime | None
     created_at: datetime
 
 

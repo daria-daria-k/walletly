@@ -1,35 +1,46 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Cookie, HTTPException, Response, status
+from fastapi import APIRouter, BackgroundTasks, Cookie, HTTPException, Request, Response, status
 
 from app.api.deps import CurrentUser, SessionDep
+from app.core import rate_limit
 from app.core.config import settings
+from app.models.enums import EmailTokenPurpose
 from app.schemas.auth import (
     ChangePasswordRequest,
+    ForgotPasswordRequest,
     LoginRequest,
     ProfileUpdate,
     RegisterRequest,
+    ResetPasswordRequest,
     SessionsInfo,
     TokenResponse,
     UserProfile,
     UserRead,
+    VerifyEmailRequest,
 )
+from app.services import mailer
 from app.services.auth import (
     EmailAlreadyRegisteredError,
     InactiveUserError,
     InvalidCredentialsError,
+    InvalidEmailTokenError,
     InvalidRefreshTokenError,
     TokenPair,
     authenticate,
     change_password,
     count_active_sessions,
+    create_email_token,
     current_subscription,
+    find_active_user_by_email,
     issue_tokens,
     register_user,
+    reset_password,
     revoke_other_sessions,
     revoke_refresh_token,
     rotate_refresh_token,
     update_profile,
+    verify_email,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -39,6 +50,19 @@ REFRESH_COOKIE = "refresh_token"
 REFRESH_COOKIE_PATH = "/api/auth"
 
 RefreshCookie = Annotated[str | None, Cookie(alias=REFRESH_COOKIE)]
+
+LOGIN_WINDOW_SECONDS = 15 * 60
+# Связка «адрес + email» ловит подбор одного пароля. Блокировать только по email нельзя:
+# тогда любой мог бы закрыть вход чужому аккаунту, просто вводя неверный пароль
+LOGIN_LIMIT_PAIR = 10
+# Отдельный лимит на адрес ловит перебор многих email. Он выше: за одним адресом бывает целый офис
+LOGIN_LIMIT_IP = 100
+FORGOT_WINDOW_SECONDS = 60 * 60
+FORGOT_LIMIT = 3
+
+
+def _client_ip(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
 
 
 def _token_response(response: Response, tokens: TokenPair) -> TokenResponse:
@@ -62,24 +86,92 @@ def _delete_refresh_cookie(response: Response) -> None:
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
-async def register(data: RegisterRequest, session: SessionDep) -> UserRead:
+async def register(
+    data: RegisterRequest, session: SessionDep, background: BackgroundTasks
+) -> UserRead:
     # Роутер переводит ошибки сервиса на язык HTTP — сам сервис про HTTP ничего не знает
     try:
         user = await register_user(session, data)
     except EmailAlreadyRegisteredError:
         raise HTTPException(status.HTTP_409_CONFLICT, "Email уже зарегистрирован") from None
+    token = await create_email_token(session, user.id, EmailTokenPurpose.EMAIL_VERIFICATION)
+    # В фоне: пользователь не должен ждать почтовый сервер
+    background.add_task(mailer.send_email_verification, user.email, token)
     return UserRead.model_validate(user)
 
 
 @router.post("/login")
-async def login(data: LoginRequest, session: SessionDep, response: Response) -> TokenResponse:
+async def login(
+    data: LoginRequest, session: SessionDep, request: Request, response: Response
+) -> TokenResponse:
+    ip = _client_ip(request)
+    ip_key = f"login:ip:{ip}"
+    pair_key = f"login:pair:{ip}:{data.email}"
+    if await rate_limit.is_blocked(pair_key, LOGIN_LIMIT_PAIR) or await rate_limit.is_blocked(
+        ip_key, LOGIN_LIMIT_IP
+    ):
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS, "Слишком много попыток. Попробуйте через 15 минут"
+        )
     try:
         user = await authenticate(session, data.email, data.password)
     except InvalidCredentialsError:
+        await rate_limit.hit(pair_key, LOGIN_WINDOW_SECONDS)
+        await rate_limit.hit(ip_key, LOGIN_WINDOW_SECONDS)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Неверный email или пароль") from None
     except InactiveUserError:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Аккаунт заблокирован") from None
+    await rate_limit.clear(pair_key)
     return _token_response(response, await issue_tokens(session, user.id))
+
+
+@router.post("/forgot-password", status_code=status.HTTP_204_NO_CONTENT)
+async def forgot_password(
+    data: ForgotPasswordRequest, session: SessionDep, background: BackgroundTasks
+) -> None:
+    # Ответ всегда одинаковый: по нему нельзя узнать, кто зарегистрирован
+    key = f"forgot:{data.email}"
+    if await rate_limit.is_blocked(key, FORGOT_LIMIT):
+        return
+    await rate_limit.hit(key, FORGOT_WINDOW_SECONDS)
+    user = await find_active_user_by_email(session, data.email)
+    if user is not None:
+        token = await create_email_token(session, user.id, EmailTokenPurpose.PASSWORD_RESET)
+        background.add_task(mailer.send_password_reset, user.email, token)
+
+
+@router.post("/reset-password", status_code=status.HTTP_204_NO_CONTENT)
+async def reset_my_password(data: ResetPasswordRequest, session: SessionDep) -> None:
+    try:
+        await reset_password(session, data.token, data.new_password)
+    except InvalidEmailTokenError:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "Ссылка устарела. Запросите новую"
+        ) from None
+
+
+@router.post("/verify-email", status_code=status.HTTP_204_NO_CONTENT)
+async def verify_my_email(data: VerifyEmailRequest, session: SessionDep) -> None:
+    try:
+        await verify_email(session, data.token)
+    except InvalidEmailTokenError:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "Ссылка устарела. Отправьте письмо ещё раз"
+        ) from None
+
+
+@router.post("/resend-verification", status_code=status.HTTP_204_NO_CONTENT)
+async def resend_verification(
+    user: CurrentUser, session: SessionDep, background: BackgroundTasks
+) -> None:
+    if user.email_verified_at is not None:
+        return
+    key = f"verify:{user.id}"
+    if await rate_limit.is_blocked(key, FORGOT_LIMIT):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Письмо уже отправлено, проверьте почту")
+    await rate_limit.hit(key, FORGOT_WINDOW_SECONDS)
+    token = await create_email_token(session, user.id, EmailTokenPurpose.EMAIL_VERIFICATION)
+    background.add_task(mailer.send_email_verification, user.email, token)
 
 
 @router.post("/refresh")

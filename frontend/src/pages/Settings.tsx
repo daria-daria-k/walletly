@@ -51,6 +51,15 @@ export function SettingsPage() {
   const queryClient = useQueryClient();
   const { data: sessions } = useQuery({ queryKey: ['sessions'], queryFn: () => api<{ active: number }>('/auth/sessions'), enabled: section === 'Безопасность' });
 
+  async function resendVerification() {
+    try {
+      await api('/auth/resend-verification', { method: 'POST' });
+      setProfileNote({ ok: 'Письмо отправлено, проверьте почту' });
+    } catch (err) {
+      setProfileNote({ error: errorText(err) });
+    }
+  }
+
   async function saveProfile(event: FormEvent) {
     event.preventDefault();
     try {
@@ -125,6 +134,9 @@ export function SettingsPage() {
               <div className="settings-form">
                 <label className="wide">Имя<input value={name} onChange={(e) => setName(e.target.value)} maxLength={100} required /></label>
                 <label className="wide">Email<input value={user?.email ?? ''} disabled /></label>
+                {user && !user.email_verified_at && (
+                  <p className="wide email-unverified">Адрес не подтверждён. <button type="button" onClick={resendVerification}>Отправить письмо ещё раз</button></p>
+                )}
               </div>
               <div className="settings-actions"><button className="primary-button">Сохранить изменения</button></div>
               <ErrorNote text={profileNote.error} />

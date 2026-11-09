@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 from functools import cache
 
 from fastapi.concurrency import run_in_threadpool
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,13 +16,14 @@ from app.core.security import (
     verify_password,
 )
 from app.models import (
+    EmailToken,
     Ledger,
     LedgerMember,
     RefreshToken,
     Subscription,
     User,
 )
-from app.models.enums import LedgerType, MemberRole, Plan
+from app.models.enums import EmailTokenPurpose, LedgerType, MemberRole, Plan
 from app.schemas.auth import ProfileUpdate, RegisterRequest
 from app.services.ledger import add_default_categories
 
@@ -41,6 +42,16 @@ class InactiveUserError(Exception):
 
 class InvalidRefreshTokenError(Exception):
     pass
+
+
+class InvalidEmailTokenError(Exception):
+    pass
+
+
+_EMAIL_TOKEN_TTL = {
+    EmailTokenPurpose.PASSWORD_RESET: timedelta(hours=1),
+    EmailTokenPurpose.EMAIL_VERIFICATION: timedelta(days=7),
+}
 
 
 @dataclass(frozen=True)
@@ -119,6 +130,87 @@ async def change_password(
     user.password_hash = await run_in_threadpool(hash_password, new_password)
     await revoke_all_refresh_tokens(session, user.id)
     return await issue_tokens(session, user.id)
+
+
+# --- Ссылки из писем ---
+
+
+async def create_email_token(
+    session: AsyncSession, user_id: int, purpose: EmailTokenPurpose
+) -> str:
+    """Новая ссылка отменяет предыдущие того же назначения: действует только последнее письмо."""
+    now = datetime.now(UTC)
+    await session.execute(
+        update(EmailToken)
+        .where(
+            EmailToken.user_id == user_id,
+            EmailToken.purpose == purpose,
+            EmailToken.used_at.is_(None),
+        )
+        .values(used_at=now)
+    )
+    token = generate_refresh_token()
+    session.add(
+        EmailToken(
+            user_id=user_id,
+            purpose=purpose,
+            token_hash=hash_refresh_token(token),
+            expires_at=now + _EMAIL_TOKEN_TTL[purpose],
+        )
+    )
+    await session.commit()
+    return token
+
+
+async def _consume_email_token(
+    session: AsyncSession, token: str, purpose: EmailTokenPurpose
+) -> User:
+    """Без commit: отметка об использовании фиксируется вместе с самим действием."""
+    now = datetime.now(UTC)
+    stored = await session.scalar(
+        select(EmailToken)
+        .where(EmailToken.token_hash == hash_refresh_token(token), EmailToken.purpose == purpose)
+        # Блокировка: два одновременных запроса не смогут использовать ссылку дважды
+        .with_for_update()
+    )
+    if stored is None or stored.used_at is not None or stored.expires_at <= now:
+        raise InvalidEmailTokenError
+    stored.used_at = now
+    user = await session.get(User, stored.user_id)
+    if user is None or not user.is_active:
+        raise InvalidEmailTokenError
+    return user
+
+
+async def find_active_user_by_email(session: AsyncSession, email: str) -> User | None:
+    return await session.scalar(select(User).where(User.email == email, User.is_active.is_(True)))
+
+
+async def reset_password(session: AsyncSession, token: str, new_password: str) -> None:
+    user = await _consume_email_token(session, token, EmailTokenPurpose.PASSWORD_RESET)
+    user.password_hash = await run_in_threadpool(hash_password, new_password)
+    # Сброс часто означает, что доступ потерян или украден, — закрываем все устройства
+    await revoke_all_refresh_tokens(session, user.id)
+    # Письмо пришло на этот адрес, значит, он настоящий
+    user.email_verified_at = user.email_verified_at or datetime.now(UTC)
+    await session.commit()
+
+
+async def verify_email(session: AsyncSession, token: str) -> None:
+    user = await _consume_email_token(session, token, EmailTokenPurpose.EMAIL_VERIFICATION)
+    user.email_verified_at = user.email_verified_at or datetime.now(UTC)
+    await session.commit()
+
+
+async def delete_stale_tokens(session: AsyncSession) -> int:
+    """Запускается по расписанию: истёкшие токены больше ни для чего не нужны."""
+    now = datetime.now(UTC)
+    refresh = await session.execute(delete(RefreshToken).where(RefreshToken.expires_at <= now))
+    email = await session.execute(
+        delete(EmailToken).where(or_(EmailToken.expires_at <= now, EmailToken.used_at.is_not(None)))
+    )
+    await session.commit()
+    return refresh.rowcount + email.rowcount
 
 
 # --- Вход ---

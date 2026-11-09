@@ -45,6 +45,11 @@ class AccountKind(StrEnum):
     CASH = "cash"
 
 
+class EmailTokenPurpose(StrEnum):
+    PASSWORD_RESET = "password_reset"
+    EMAIL_VERIFICATION = "email_verification"
+
+
 class TransactionType(StrEnum):
     INCOME = "income"
     EXPENSE = "expense"

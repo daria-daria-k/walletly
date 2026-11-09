@@ -6,7 +6,7 @@
 import asyncio
 import random
 import sys
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, UTC
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -116,6 +116,7 @@ async def seed() -> None:
         )
         demo.role = UserRole.ADMIN
         demo.onboarding_completed = partner.onboarding_completed = True
+        demo.email_verified_at = partner.email_verified_at = datetime.now(UTC)
 
         personal_id = await session.scalar(
             select(LedgerMember.ledger_id).where(LedgerMember.user_id == demo.id)

@@ -4,7 +4,7 @@ export type Plan = 'free' | 'premium';
 
 export type AccountKind = 'card' | 'savings' | 'deposit' | 'cash';
 export interface NotificationSettings { budget: boolean; unusual: boolean; weekly: boolean; family: boolean }
-export interface User { id: number; email: string; name: string; role: 'user' | 'admin'; created_at: string; onboarding_completed: boolean; notifications: NotificationSettings; plan?: Plan; plan_expires_at?: string | null }
+export interface User { id: number; email: string; name: string; role: 'user' | 'admin'; created_at: string; onboarding_completed: boolean; notifications: NotificationSettings; email_verified_at: string | null; plan?: Plan; plan_expires_at?: string | null }
 export interface Ledger { id: number; name: string; type: 'personal' | 'shared'; owner_id: number; created_at: string; role: Role }
 export interface Member { user_id: number; name: string; email: string; role: Role; joined_at: string }
 export interface Account { id: number; name: string; currency: string; kind: AccountKind; initial_balance: string; balance: string; month_change: string; is_active: boolean; sort_order: number }

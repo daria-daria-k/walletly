@@ -4,12 +4,14 @@ import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 
+import fakeredis.aioredis
 import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
+from app.core import rate_limit
 from app.core.config import settings
 from app.core.database import get_session
 from app.main import app
@@ -47,6 +49,12 @@ def test_database() -> None:
 def anyio_backend() -> str:
     # Плагин anyio (ставится вместе с FastAPI) запускает async-тесты в asyncio
     return "asyncio"
+
+
+@pytest.fixture(autouse=True)
+def fake_redis() -> None:
+    # Новая имитация на каждый тест: счётчики попыток не должны переходить между тестами
+    rate_limit.set_client(fakeredis.aioredis.FakeRedis(decode_responses=True))
 
 
 @pytest.fixture

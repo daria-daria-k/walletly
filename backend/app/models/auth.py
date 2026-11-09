@@ -4,6 +4,7 @@ from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, CreatedAt, IntPK
+from app.models.enums import EmailTokenPurpose
 
 
 class RefreshToken(Base):
@@ -17,6 +18,22 @@ class RefreshToken(Base):
     expires_at: Mapped[datetime]
     # None — токен действует; дата — когда отозван (ротация, выход, подозрение на кражу)
     revoked_at: Mapped[datetime | None]
+    created_at: Mapped[CreatedAt]
+
+
+class EmailToken(Base):
+    """Одноразовая ссылка из письма. Как и refresh, хранится только хешем:
+    утечка базы не должна давать возможность сбросить чужой пароль."""
+
+    __tablename__ = "email_tokens"
+
+    id: Mapped[IntPK]
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    # Назначение проверяется: ссылка подтверждения не должна сбрасывать пароль
+    purpose: Mapped[EmailTokenPurpose]
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    expires_at: Mapped[datetime]
+    used_at: Mapped[datetime | None]
     created_at: Mapped[CreatedAt]
 
 

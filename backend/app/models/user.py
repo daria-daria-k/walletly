@@ -27,6 +27,8 @@ class User(Base):
     notifications: Mapped[dict] = mapped_column(
         JSONB, default=dict, server_default=text("'{}'::jsonb")
     )
+    # None — адрес не подтверждён. Вход не запрещаем: письмо может задержаться
+    email_verified_at: Mapped[datetime | None]
     created_at: Mapped[CreatedAt]
 
     subscriptions: Mapped[list["Subscription"]] = relationship(back_populates="user")

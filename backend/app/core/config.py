@@ -24,6 +24,17 @@ class Settings(BaseSettings):
     # Secure-cookie передаётся только по HTTPS. Локально HTTPS нет — на сервере включим
     cookie_secure: bool = False
 
+    redis_url: str = "redis://localhost:6379/0"
+    # Адрес приложения для ссылок в письмах
+    app_url: str = "http://localhost:8080"
+    # Без smtp_host письма печатаются в лог
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = "Walletly <noreply@walletly.local>"
+    smtp_tls: bool = True
+
     @property
     def database_url(self) -> URL:
         # URL.create сам экранирует спецсимволы в пароле, в отличие от f-строки

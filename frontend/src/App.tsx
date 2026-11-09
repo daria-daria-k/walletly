@@ -7,7 +7,7 @@ import { AccountsPage } from './pages/Accounts';
 import { AdminPage } from './pages/Admin';
 import { AiPage } from './pages/Ai';
 import { AnalyticsPage } from './pages/Analytics';
-import { LoginPage, RegisterPage } from './pages/Auth';
+import { ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage, VerifyEmailPage } from './pages/Auth';
 import { CategoriesPage } from './pages/Categories';
 import { FamilyPage } from './pages/Family';
 import { ImportPage } from './pages/Import';
@@ -57,6 +57,9 @@ export function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route element={<RequireAuth />}>
         <Route path="/invite/:token" element={<InvitePage />} />
         <Route element={<AppShell />}>
