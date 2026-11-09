@@ -14,6 +14,7 @@ services:
     image: caddy:2-alpine
     container_name: walletly-caddy
     restart: unless-stopped
+    mem_limit: 128m
     ports:
       - "80:80"
       - "443:443"
@@ -27,19 +28,28 @@ services:
       - web
 
   backup:
-    image: postgres:17-alpine
+    build: ./deploy/backup
     container_name: walletly-backup
     restart: unless-stopped
+    mem_limit: 256m
     environment:
       PGHOST: db
       PGUSER: ${POSTGRES_USER}
       PGPASSWORD: ${POSTGRES_PASSWORD}
       PGDATABASE: ${POSTGRES_DB}
       KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+      # Без пароля сервер не запустится: незашифрованных копий быть не должно
+      BACKUP_PASSPHRASE: ${BACKUP_PASSPHRASE:?Задайте BACKUP_PASSPHRASE в .env}
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
+      RCLONE_CONFIG_BACKUPS_TYPE: s3
+      RCLONE_CONFIG_BACKUPS_PROVIDER: Other
+      RCLONE_CONFIG_BACKUPS_ENDPOINT: ${BACKUP_S3_ENDPOINT:-}
+      RCLONE_CONFIG_BACKUPS_REGION: ${BACKUP_S3_REGION:-ru-1}
+      RCLONE_CONFIG_BACKUPS_ACCESS_KEY_ID: ${BACKUP_S3_ACCESS_KEY:-}
+      RCLONE_CONFIG_BACKUPS_SECRET_ACCESS_KEY: ${BACKUP_S3_SECRET_KEY:-}
     volumes:
-      - ./deploy/backup-loop.sh:/backup-loop.sh:ro
       - ./backups:/backups
-    command: ["sh", "/backup-loop.sh"]
+    command: ["backup-loop.sh"]
     depends_on:
       db:
         condition: service_healthy

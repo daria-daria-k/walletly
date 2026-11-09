@@ -5,6 +5,10 @@ on:
     branches: [main, mvp]
   pull_request:
 
+# Тестам достаточно прочитать код: взломанный шаг не сможет ничего записать в репозиторий
+permissions:
+  contents: read
+
 jobs:
   backend:
     runs-on: ubuntu-latest

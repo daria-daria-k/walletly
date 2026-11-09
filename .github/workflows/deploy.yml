@@ -4,12 +4,16 @@ name: Deploy
 on:
   workflow_dispatch:
 
+# Шаг работает только по SSH: права на репозиторий ему не нужны
+permissions: {}
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Обновить приложение на сервере
-        uses: appleboy/ssh-action@v1
+        # Закреплено по хешу: этот шаг получает SSH-ключ сервера, а тег автор может переставить
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
