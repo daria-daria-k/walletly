@@ -28,7 +28,7 @@ export function InvitePage() {
   return (
     <div className="auth-page" data-theme="violet">
       <section className="modal auth-card">
-        <div className="brand"><span className="brand-mark">W</span><span>Walletly</span></div>
+        <div className="brand"><img className="brand-mark" src="/brand/walletly-mark.svg" alt="" /><span>Walletly</span></div>
         {isLoading && <p>Загрузка…</p>}
         <ErrorNote text={loadError ? errorText(loadError) : error} />
         {data && (

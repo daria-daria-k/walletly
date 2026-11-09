@@ -38,7 +38,7 @@ export function LoginPage() {
   return (
     <div className="auth-page" data-theme="violet">
       <section className="modal auth-card">
-        <div className="brand"><span className="brand-mark">W</span><span>Walletly</span></div>
+        <div className="brand"><img className="brand-mark" src="/brand/walletly-mark.svg" alt="" /><span>Walletly</span></div>
         <div className="modal-head"><h2>Вход</h2></div>
         <form onSubmit={submit} style={{ marginTop: 16 }}>
           <label>Email<input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus /></label>
@@ -80,7 +80,7 @@ export function RegisterPage() {
   return (
     <div className="auth-page" data-theme="violet">
       <section className="modal auth-card">
-        <div className="brand"><span className="brand-mark">W</span><span>Walletly</span></div>
+        <div className="brand"><img className="brand-mark" src="/brand/walletly-mark.svg" alt="" /><span>Walletly</span></div>
         <div className="modal-head"><h2>Регистрация</h2></div>
         <form onSubmit={submit} style={{ marginTop: 16 }}>
           <label>Имя<input autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} required maxLength={100} autoFocus /></label>
