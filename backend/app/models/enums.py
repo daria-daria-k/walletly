@@ -38,6 +38,13 @@ class CategoryType(StrEnum):
     EXPENSE = "expense"
 
 
+class AccountKind(StrEnum):
+    CARD = "card"
+    SAVINGS = "savings"
+    DEPOSIT = "deposit"
+    CASH = "cash"
+
+
 class TransactionType(StrEnum):
     INCOME = "income"
     EXPENSE = "expense"

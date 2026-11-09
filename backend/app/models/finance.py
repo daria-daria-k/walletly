@@ -7,7 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, CreatedAt, IntPK
 from app.models.category import Category
-from app.models.enums import TransactionType
+from app.models.enums import AccountKind, TransactionType
 
 if TYPE_CHECKING:
     from app.models.user import User
@@ -25,6 +25,9 @@ class Account(Base):
     ledger_id: Mapped[int] = mapped_column(ForeignKey("ledgers.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(50))
     currency: Mapped[str] = mapped_column(String(3), default="RUB", server_default="RUB")
+    kind: Mapped[AccountKind] = mapped_column(
+        default=AccountKind.CARD, server_default=AccountKind.CARD.value
+    )
     # Остаток на момент начала учёта в Walletly
     initial_balance: Mapped[Decimal] = mapped_column(Money, default=Decimal(0), server_default="0")
     is_active: Mapped[bool] = mapped_column(default=True, server_default=true())

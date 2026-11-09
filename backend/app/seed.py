@@ -14,7 +14,7 @@ from sqlalchemy import select
 from app.core.config import settings
 from app.core.database import SessionLocal, engine
 from app.models import Account, Category, CategoryGroup, LedgerMember, Transaction, User
-from app.models.enums import CategoryType, MemberRole, TransactionType, UserRole
+from app.models.enums import AccountKind, CategoryType, MemberRole, TransactionType, UserRole
 from app.schemas.auth import RegisterRequest
 from app.schemas.ledger import LedgerCreate
 from app.services.auth import register_user
@@ -38,7 +38,7 @@ EXPENSES = {
 
 async def _fill_ledger(session, ledger_id: int, user_id: int, rng: random.Random) -> None:
     card = Account(ledger_id=ledger_id, name="Сбер", initial_balance=Decimal("35000"), sort_order=0)
-    cash = Account(ledger_id=ledger_id, name="Наличные", initial_balance=Decimal("5000"), sort_order=1)
+    cash = Account(ledger_id=ledger_id, name="Наличные", kind=AccountKind.CASH, initial_balance=Decimal("5000"), sort_order=1)
     session.add_all([card, cash])
     await session.flush()
 
@@ -115,6 +115,7 @@ async def seed() -> None:
             session, RegisterRequest(email=PARTNER_EMAIL, password=PASSWORD, name="Партнёр")
         )
         demo.role = UserRole.ADMIN
+        demo.onboarding_completed = partner.onboarding_completed = True
 
         personal_id = await session.scalar(
             select(LedgerMember.ledger_id).where(LedgerMember.user_id == demo.id)

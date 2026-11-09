@@ -9,6 +9,7 @@ from app.schemas.auth import (
     LoginRequest,
     ProfileUpdate,
     RegisterRequest,
+    SessionsInfo,
     TokenResponse,
     UserProfile,
     UserRead,
@@ -21,9 +22,11 @@ from app.services.auth import (
     TokenPair,
     authenticate,
     change_password,
-    current_plan,
+    count_active_sessions,
+    current_subscription,
     issue_tokens,
     register_user,
+    revoke_other_sessions,
     revoke_refresh_token,
     rotate_refresh_token,
     update_profile,
@@ -106,13 +109,32 @@ async def logout(session: SessionDep, response: Response, refresh_token: Refresh
 
 @router.get("/me")
 async def me(user: CurrentUser, session: SessionDep) -> UserProfile:
-    plan = await current_plan(session, user.id)
-    return UserProfile(**UserRead.model_validate(user).model_dump(), plan=plan)
+    subscription = await current_subscription(session, user.id)
+    return UserProfile(
+        **UserRead.model_validate(user).model_dump(),
+        plan=subscription.plan,
+        plan_expires_at=subscription.expires_at,
+    )
 
 
 @router.patch("/me")
 async def update_me(data: ProfileUpdate, user: CurrentUser, session: SessionDep) -> UserRead:
-    return UserRead.model_validate(await update_profile(session, user, data.name))
+    return UserRead.model_validate(await update_profile(session, user, data))
+
+
+@router.get("/sessions")
+async def sessions(user: CurrentUser, session: SessionDep) -> SessionsInfo:
+    return SessionsInfo(active=await count_active_sessions(session, user.id))
+
+
+@router.post("/sessions/revoke-others", status_code=status.HTTP_204_NO_CONTENT)
+async def revoke_others(
+    user: CurrentUser, session: SessionDep, refresh_token: RefreshCookie = None
+) -> None:
+    # Без cookie нельзя понять, какая сессия текущая, и отозвали бы все
+    if refresh_token is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Текущая сессия не определена")
+    await revoke_other_sessions(session, user.id, refresh_token)
 
 
 @router.post("/change-password")

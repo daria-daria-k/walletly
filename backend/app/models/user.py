@@ -1,7 +1,8 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, String, true
+from sqlalchemy import ForeignKey, String, false, text, true
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, CreatedAt, IntPK
@@ -20,6 +21,12 @@ class User(Base):
     name: Mapped[str] = mapped_column(String(100))
     role: Mapped[UserRole] = mapped_column(default=UserRole.USER, server_default=UserRole.USER.value)
     is_active: Mapped[bool] = mapped_column(default=True, server_default=true())
+    # Новый пользователь проходит первичную настройку, существующих миграция отмечает готовыми
+    onboarding_completed: Mapped[bool] = mapped_column(default=False, server_default=false())
+    # JSON, а не колонки: набор событий будет меняться, пустой объект означает значения по умолчанию
+    notifications: Mapped[dict] = mapped_column(
+        JSONB, default=dict, server_default=text("'{}'::jsonb")
+    )
     created_at: Mapped[CreatedAt]
 
     subscriptions: Mapped[list["Subscription"]] = relationship(back_populates="user")

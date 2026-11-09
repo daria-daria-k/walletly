@@ -25,8 +25,20 @@ class LoginRequest(BaseModel):
     password: str = Field(max_length=128)
 
 
+class NotificationSettings(BaseModel):
+    budget: bool = True
+    unusual: bool = True
+    weekly: bool = True
+    family: bool = True
+
+
 class ProfileUpdate(BaseModel):
-    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
+    # default=None при типе без None: поле можно не передавать, а явный null — ошибка 422
+    name: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)
+    ] = Field(default=None)
+    onboarding_completed: bool = Field(default=None)
+    notifications: NotificationSettings = Field(default=None)
 
 
 class ChangePasswordRequest(BaseModel):
@@ -52,6 +64,8 @@ class UserRead(BaseModel):
     email: str
     name: str
     role: UserRole
+    onboarding_completed: bool
+    notifications: NotificationSettings
     created_at: datetime
 
 
@@ -59,3 +73,8 @@ class UserProfile(UserRead):
     """Текущий пользователь: интерфейсу нужен ещё и тариф."""
 
     plan: Plan
+    plan_expires_at: datetime | None  # None — бессрочно
+
+
+class SessionsInfo(BaseModel):
+    active: int

@@ -17,6 +17,7 @@ def _to_read(account: Account, balance: Decimal, month_change: Decimal) -> Accou
         id=account.id,
         name=account.name,
         currency=account.currency,
+        kind=account.kind,
         initial_balance=account.initial_balance,
         balance=balance,
         month_change=month_change,

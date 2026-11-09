@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 from functools import cache
 
 from fastapi.concurrency import run_in_threadpool
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,7 +23,7 @@ from app.models import (
     User,
 )
 from app.models.enums import LedgerType, MemberRole, Plan
-from app.schemas.auth import RegisterRequest
+from app.schemas.auth import ProfileUpdate, RegisterRequest
 from app.services.ledger import add_default_categories
 
 
@@ -94,18 +94,18 @@ async def register_user(session: AsyncSession, data: RegisterRequest) -> User:
 # --- Профиль ---
 
 
-async def current_plan(session: AsyncSession, user_id: int) -> Plan:
-    # Действующий тариф — последняя запись: старые подписки остаются как история
+async def current_subscription(session: AsyncSession, user_id: int) -> Subscription:
     return await session.scalar(
-        select(Subscription.plan)
+        select(Subscription)
         .where(Subscription.user_id == user_id)
         .order_by(Subscription.id.desc())
         .limit(1)
     )
 
 
-async def update_profile(session: AsyncSession, user: User, name: str) -> User:
-    user.name = name
+async def update_profile(session: AsyncSession, user: User, data: ProfileUpdate) -> User:
+    for field, value in data.model_dump(exclude_unset=True).items():
+        setattr(user, field, value)
     await session.commit()
     return user
 
@@ -168,6 +168,32 @@ async def revoke_all_refresh_tokens(session: AsyncSession, user_id: int) -> None
         .where(RefreshToken.user_id == user_id, RefreshToken.revoked_at.is_(None))
         .values(revoked_at=datetime.now(UTC))
     )
+
+
+async def count_active_sessions(session: AsyncSession, user_id: int) -> int:
+    # При ротации старый токен отзывается, поэтому действующий токен — это одно устройство
+    return await session.scalar(
+        select(func.count())
+        .select_from(RefreshToken)
+        .where(
+            RefreshToken.user_id == user_id,
+            RefreshToken.revoked_at.is_(None),
+            RefreshToken.expires_at > datetime.now(UTC),
+        )
+    )
+
+
+async def revoke_other_sessions(session: AsyncSession, user_id: int, refresh_token: str) -> None:
+    await session.execute(
+        update(RefreshToken)
+        .where(
+            RefreshToken.user_id == user_id,
+            RefreshToken.revoked_at.is_(None),
+            RefreshToken.token_hash != hash_refresh_token(refresh_token),
+        )
+        .values(revoked_at=datetime.now(UTC))
+    )
+    await session.commit()
 
 
 async def rotate_refresh_token(session: AsyncSession, refresh_token: str) -> TokenPair:
