@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, BadgeCheck, Check, ChevronRight, Gauge, RefreshCw, Sparkles, WandSparkles } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../auth';
 import { api } from '../api/client';
 import type { Insights } from '../api/types';
 import { ErrorState, LoadingState, PageHeading } from '../components/ui';
@@ -22,6 +23,7 @@ function InsightCard({ tone, icon, label, title, text, action, onAction }: { ton
 
 export function AiPage() {
   const { base } = useLedger();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: [base, 'insights'],
@@ -33,6 +35,7 @@ export function AiPage() {
 
   const { forecast, anomaly, overspend, limits, plan } = data;
   const change = forecast.change_percent;
+  const ring = forecast.method === 'ml' ? forecast.accuracy_percent ?? 0 : forecast.month_progress;
   const compare = change === null
     ? 'Сравнение появится, когда накопится история за прошлые месяцы.'
     : `Это на ${Math.abs(change)}% ${change >= 0 ? 'больше' : 'меньше'}, чем в среднем за прошлые месяцы.`;
@@ -56,9 +59,9 @@ export function AiPage() {
           <h2>Расходы составят около {money(Math.round(Number(forecast.projected)))}</h2>
           <span>{compare}{growth}</span>
         </div>
-        {/* В макете здесь точность модели. Модели пока нет, поэтому показываем, сколько месяца позади */}
-        <div className="forecast-ring" style={{ background: `conic-gradient(#fff 0 ${forecast.month_progress}%,#ffffff25 ${forecast.month_progress}%)` }}>
-          <div><b>{forecast.month_progress}%</b><span>месяца прошло</span></div>
+        {/* Точность измерена на прошлых месяцах. Без модели показываем только, сколько месяца позади */}
+        <div className="forecast-ring" style={{ background: `conic-gradient(#fff 0 ${ring}%,#ffffff25 ${ring}%)` }}>
+          {forecast.method === 'ml' ? <div><b>{forecast.accuracy_percent}%</b><span>точность</span></div> : <div><b>{forecast.month_progress}%</b><span>месяца прошло</span></div>}
         </div>
       </section>
       <div className="ai-cards">
@@ -91,7 +94,7 @@ export function AiPage() {
           </div>
         </section>
       )}
-      <p className="ai-note">Пока подсказки считаются по статистике ваших операций. Модели машинного обучения появятся позже.</p>
+      <p className="ai-note">{forecast.method === 'ml' ? 'Прогноз строит модель, обученная на ваших операциях. Точность измерена на прошлых месяцах.' : user?.plan === 'premium' ? 'Для модели нужны полные операции хотя бы за три месяца, пока прогноз считается по темпу расходов.' : 'Подсказки считаются по статистике ваших операций. Обученные модели доступны в тарифе Premium.'}</p>
     </div>
   );
 }

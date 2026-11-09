@@ -216,3 +216,5 @@
 .admin-plans h3,.admin-plans h2{margin:0 0 8px}
 .admin-plans small{color:var(--muted);font-size:13px;font-weight:400}
 .admin-plans p{margin:0;color:var(--muted);font-size:13px}
+
+.ml-hint{margin:8px 0 0;color:var(--purple);font-size:12px}

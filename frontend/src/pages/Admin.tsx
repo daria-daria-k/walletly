@@ -3,13 +3,13 @@ import { Download, MoreHorizontal, Search, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, errorText } from '../api/client';
-import type { AdminPayment, AdminStats, AdminUser, AuditEntry, PlanInfo } from '../api/types';
+import type { AdminPayment, AdminStats, AdminUser, AuditEntry, MlReport, PlanInfo } from '../api/types';
 import { useAuth } from '../auth';
 import { StyledSelect } from '../components/StyledSelect';
 import { ErrorNote, ErrorState, LoadingState, Modal, PageHeading, State, StateCard } from '../components/ui';
 import { dateTime, initials, money } from '../lib/format';
 
-const SECTIONS = ['Дашборд', 'Пользователи', 'Тарифы', 'Платежи', 'Аудит'];
+const SECTIONS = ['Дашборд', 'Пользователи', 'Тарифы', 'Платежи', 'Модели', 'Аудит'];
 
 const percent = (part: number, whole: number) => (whole ? `${Math.round((part / whole) * 100)}%` : '—');
 const planLabel = (plan: string) => (plan === 'premium' ? 'Premium' : 'Free');
@@ -190,6 +190,25 @@ function Payments() {
   );
 }
 
+function Models() {
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['admin', 'ml'], queryFn: () => api<MlReport>('/admin/ml') });
+  if (isLoading) return <LoadingState />;
+  if (isError || !data) return <ErrorState onRetry={() => refetch()} />;
+  const verdict = data.winner ? `Вариант ${data.winner} лучше, разница статистически значима.` : 'Пока нельзя сказать, какая модель лучше: нужно не меньше 100 решений на вариант и p < 0,05.';
+  return (
+    <div className="admin-plans">
+      {data.variants.map((item) => (
+        <section className="card" key={item.variant}>
+          <h3>Вариант {item.variant}: {item.variant === 'A' ? 'scikit-learn' : 'PyTorch'}</h3>
+          <h2>{item.decided ? `${Math.round((item.accepted / item.decided) * 100)}%` : '—'}<small> принято подсказок</small></h2>
+          <p>Решений: {item.decided}. Точность на проверке: {item.accuracy === null ? 'модели ещё не обучены' : `${Math.round(item.accuracy * 100)}%`}.</p>
+        </section>
+      ))}
+      <section className="card"><h3>Итог A/B-теста</h3><p>{verdict}</p>{data.p_value !== null && <p>p = {data.p_value.toFixed(3)}</p>}</section>
+    </div>
+  );
+}
+
 export function AdminPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -219,6 +238,7 @@ export function AdminPage() {
       {section === 'Аудит' && <Audit />}
       {section === 'Тарифы' && <Plans />}
       {section === 'Платежи' && <Payments />}
+      {section === 'Модели' && <Models />}
     </div>
   );
 }

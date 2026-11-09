@@ -10,6 +10,7 @@ import logging
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.core.database import SessionLocal
+from app.ml.train import train_all
 from app.services import mailer
 from app.services.auth import delete_stale_tokens
 from app.services.notification import delete_old, run_checks
@@ -38,11 +39,16 @@ async def cleanup_notifications() -> None:
         await delete_old(session)
 
 
+async def train_models() -> None:
+    logger.info("Обучено пространств: %s", await train_all())
+
+
 def build_scheduler() -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler(timezone="UTC")
     scheduler.add_job(cleanup_tokens, "cron", hour=3, minute=0)
     scheduler.add_job(cleanup_notifications, "cron", hour=3, minute=10)
     scheduler.add_job(check_notifications, "cron", minute=5)
+    scheduler.add_job(train_models, "cron", hour=2, minute=0)
     return scheduler
 
 

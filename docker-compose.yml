@@ -54,6 +54,7 @@ services:
       POSTGRES_HOST: db
       POSTGRES_PORT: "5432"
       REDIS_URL: redis://redis:6379/0
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-}
     command: ["python", "-m", "app.worker"]
     depends_on:
       - api

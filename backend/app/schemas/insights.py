@@ -10,6 +10,8 @@ class Forecast(BaseModel):
     baseline: Decimal | None  # средние расходы за прошлые месяцы, если они есть
     change_percent: int | None
     month_progress: int  # сколько процентов месяца прошло
+    method: str = "linear"  # linear — темп расходов, ml — обученная модель
+    accuracy_percent: int | None = None  # только у модели: измерена на прошлых месяцах
 
 
 class Anomaly(BaseModel):

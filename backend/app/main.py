@@ -17,6 +17,7 @@ from app.api.routers import (
     imports,
     invitations,
     ledgers,
+    ml,
     notifications,
     transactions,
 )
@@ -71,6 +72,7 @@ for module in (
     admin,
     notifications,
     billing,
+    ml,
 ):
     api.include_router(module.router)
 app.include_router(api)

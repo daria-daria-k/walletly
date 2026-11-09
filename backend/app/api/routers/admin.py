@@ -17,6 +17,7 @@ from app.schemas.admin import (
     AuditEntryRead,
 )
 from app.services import admin as admin_service
+from app.services import ml
 
 class AdminPayment(BaseModel):
     id: int
@@ -76,3 +77,26 @@ async def payments(_: AdminUser, session: SessionDep) -> list[AdminPayment]:
         )
         for item, email in rows
     ]
+
+
+class AbVariant(BaseModel):
+    variant: str
+    decided: int
+    accepted: int
+    accuracy: float | None
+
+
+class AbResponse(BaseModel):
+    variants: list[AbVariant]
+    p_value: float | None
+    winner: str | None
+
+
+@router.get("/ml")
+async def ml_report(_: AdminUser, session: SessionDep) -> AbResponse:
+    report = await ml.ab_report(session)
+    return AbResponse(
+        variants=[AbVariant(**vars(item)) for item in report.variants],
+        p_value=report.p_value,
+        winner=report.winner,
+    )

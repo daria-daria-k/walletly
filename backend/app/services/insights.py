@@ -11,6 +11,7 @@ from app.models import Category, Transaction
 from app.models.enums import TransactionType
 from app.schemas.insights import Anomaly, Forecast, Insights, LimitsStatus, Overspend, PlanItem
 from app.services.analytics import scoped_transactions
+from app.services.ml import ml_anomaly, ml_forecast
 
 _HISTORY_MONTHS = 3
 _ANOMALY_MONTHS = 6
@@ -106,8 +107,30 @@ async def _find_anomaly(
     return best
 
 
+async def _ml_anomaly(
+    session: AsyncSession, ledger_id: int, currency: str, today: date, names: dict[int, str]
+) -> Anomaly | None:
+    found = await ml_anomaly(session, ledger_id, currency, today)
+    if found is None:
+        return None
+    tx = await session.get(Transaction, found.transaction_id)
+    category_name = names.get(tx.category_id, "")
+    return Anomaly(
+        transaction_id=tx.id,
+        title=tx.description or category_name,
+        category_name=category_name,
+        amount=tx.amount,
+        ratio=Decimal(str(found.ratio)),
+        tx_date=tx.tx_date,
+    )
+
+
 async def build_insights(
-    session: AsyncSession, ledger_id: int, currency: str, today: date | None = None
+    session: AsyncSession,
+    ledger_id: int,
+    currency: str,
+    today: date | None = None,
+    use_ml: bool = False,
 ) -> Insights:
     today = today or date.today()
     month_start = today.replace(day=1)
@@ -124,6 +147,10 @@ async def build_insights(
     baseline_total = sum(baseline.values(), Decimal(0)) if baseline else None
     # Та же линейная оценка, что и на экране аналитики: цифры на экранах не должны расходиться
     projected = (spent / progress).quantize(Decimal("0.01"))
+    method, accuracy = "linear", None
+    if use_ml and (trained := await ml_forecast(session, ledger_id, currency, today)):
+        projected = Decimal(str(trained.projected)).quantize(Decimal("0.01"))
+        method, accuracy = "ml", trained.accuracy_percent
     change = (
         round((projected - baseline_total) / baseline_total * 100) if baseline_total else None
     )
@@ -150,8 +177,11 @@ async def build_insights(
             baseline=round(baseline_total, 2) if baseline_total else None,
             change_percent=change,
             month_progress=round(progress * 100),
+            method=method,
+            accuracy_percent=accuracy,
         ),
-        anomaly=await _find_anomaly(session, ledger_id, currency, month_start, today, names),
+        anomaly=(await _ml_anomaly(session, ledger_id, currency, today, names) if use_ml else None)
+        or await _find_anomaly(session, ledger_id, currency, month_start, today, names),
         overspend=Overspend(
             category_id=top, category_name=names[top], amount=round(overspending[top], 2)
         )

@@ -8,6 +8,8 @@ dependencies = [
     "asyncpg>=0.32.0",
     "fastapi>=0.162.0",
     "httpx>=0.28.1",
+    "mlflow-skinny>=3.18.0",
+    "numpy>=2.5.4",
     "openpyxl>=3.1.5",
     "pwdlib[argon2]>=0.3.1",
     "pydantic-settings>=2.16.1",
@@ -15,7 +17,9 @@ dependencies = [
     "pyjwt>=2.15.1",
     "python-multipart>=0.0.33",
     "redis>=8.1.0",
+    "scikit-learn>=1.9.1",
     "sqlalchemy[asyncio]>=2.1.6",
+    "torch>=2.15.0",
     "uvicorn[standard]>=0.54.0",
 ]
 
@@ -30,3 +34,12 @@ dev = [
 # Корень backend/ в sys.path — чтобы в тестах работал `import app`
 pythonpath = ["."]
 testpaths = ["tests"]
+
+# На Linux (сервер и Docker) ставим сборку PyTorch только для CPU: она в разы меньше
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

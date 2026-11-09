@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     yookassa_secret_key: str = ""
     premium_price_rub: int = 299
 
+    # Пусто — обучение идёт без записи экспериментов
+    mlflow_tracking_uri: str = ""
+
     @property
     def database_url(self) -> URL:
         # URL.create сам экранирует спецсимволы в пароле, в отличие от f-строки

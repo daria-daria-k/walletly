@@ -13,8 +13,23 @@ from sqlalchemy import select
 
 from app.core.config import settings
 from app.core.database import SessionLocal, engine
-from app.models import Account, Category, CategoryGroup, LedgerMember, Transaction, User
-from app.models.enums import AccountKind, CategoryType, MemberRole, TransactionType, UserRole
+from app.models import (
+    Account,
+    Category,
+    CategoryGroup,
+    LedgerMember,
+    Subscription,
+    Transaction,
+    User,
+)
+from app.models.enums import (
+    AccountKind,
+    CategoryType,
+    MemberRole,
+    Plan,
+    TransactionType,
+    UserRole,
+)
 from app.schemas.auth import RegisterRequest
 from app.schemas.ledger import LedgerCreate
 from app.services.auth import register_user
@@ -116,6 +131,8 @@ async def seed() -> None:
         )
         demo.role = UserRole.ADMIN
         demo.onboarding_completed = partner.onboarding_completed = True
+        # Premium, чтобы на демо были видны умные категории и прогнозы
+        session.add(Subscription(user_id=demo.id, plan=Plan.PREMIUM))
         demo.email_verified_at = partner.email_verified_at = datetime.now(UTC)
 
         personal_id = await session.scalar(

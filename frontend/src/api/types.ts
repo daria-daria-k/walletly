@@ -29,10 +29,12 @@ export interface NotificationList { items: NotificationItem[]; unread: number }
 export interface PlanInfo { price: string; period_days: number; payments_enabled: boolean }
 export interface PaymentItem { id: number; amount: string; status: 'pending' | 'succeeded' | 'canceled'; paid_at: string | null; created_at: string }
 export interface AdminPayment extends PaymentItem { email: string }
+export interface MlReport { variants: { variant: string; decided: number; accepted: number; accuracy: number | null }[]; p_value: number | null; winner: string | null }
+export interface CategorySuggestion { suggestion_id: number; category_id: number; confidence: number; variant: string }
 export interface ImportBatch { id: number; filename: string; total_rows: number; created: number; skipped_duplicates: number; errors: number; created_at: string }
 export interface AuditEntry { id: number; actor_email: string; target_email: string; action: string; detail: string; created_at: string }
 export interface Insights {
-  forecast: { spent: string; projected: string; baseline: string | null; change_percent: number | null; month_progress: number };
+  forecast: { spent: string; projected: string; baseline: string | null; change_percent: number | null; month_progress: number; method: 'linear' | 'ml'; accuracy_percent: number | null };
   anomaly: { transaction_id: number; title: string; category_name: string; amount: string; ratio: string; tx_date: string } | null;
   overspend: { category_id: number; category_name: string; amount: string } | null;
   limits: { total: number; near: number; over: number };

@@ -12,9 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from app.models import Account, Category, ImportBatch, LedgerMember, Transaction
-from app.models.enums import CategoryType, TransactionType
+from app.models.enums import CategoryType, Plan, TransactionType
 from app.schemas.imports import ImportResult, ImportRowError
+from app.services.billing import get_plan
 from app.services.errors import DomainError, InvalidDataError
+from app.services.ml import predict_for_import
 from app.services.transaction import check_fields
 
 MAX_FILE_SIZE = 5 * 1024 * 1024
@@ -132,6 +134,7 @@ class _Lookup:
         for account in accounts:
             self.accounts.setdefault(account.name.casefold(), []).append(account)
         self.categories: dict[tuple[str, CategoryType], list[Category]] = {}
+        self.by_id = {category.id: category for category in categories}
         for category in categories:
             key = (category.name.casefold(), category.group.type)
             self.categories.setdefault(key, []).append(category)
@@ -154,7 +157,20 @@ class _Lookup:
         return found[0]
 
 
-def _build(row: ParsedRow, lookup: _Lookup, member: LedgerMember) -> Transaction:
+def _predicted_category(
+    description: str, tx_type: TransactionType, lookup: _Lookup, predicted: dict[str, int]
+) -> Category | None:
+    category = lookup.by_id.get(predicted.get(description, 0))
+    # У перевода категории нет, а доход нельзя отнести к категории расходов
+    wanted = CategoryType.INCOME if tx_type == TransactionType.INCOME else CategoryType.EXPENSE
+    if category is None or tx_type == TransactionType.TRANSFER or category.group.type != wanted:
+        return None
+    return category
+
+
+def _build(
+    row: ParsedRow, lookup: _Lookup, member: LedgerMember, predicted: dict[str, int]
+) -> Transaction:
     values = row.values
     tx_date = _parse_date(values.get("date"))
     amount = _parse_amount(values.get("amount"))
@@ -172,10 +188,14 @@ def _build(row: ParsedRow, lookup: _Lookup, member: LedgerMember) -> Transaction
     to_name = _text(values.get("to_account"))
     to_account = lookup.account(to_name) if to_name else None
     category_name = _text(values.get("category"))
-    category = lookup.category(category_name, tx_type) if category_name else None
+    description = _text(values.get("description"))
+    category = (
+        lookup.category(category_name, tx_type)
+        if category_name
+        else _predicted_category(description, tx_type, lookup, predicted)
+    )
     check_fields(tx_type, account, to_account, category, check_active=True)
 
-    description = _text(values.get("description"))
     if len(description) > 500:
         raise InvalidDataError("Описание длиннее 500 символов")
 
@@ -220,11 +240,23 @@ async def import_transactions(
     )
     lookup = _Lookup(list(accounts), list(categories))
 
+    predicted: dict[str, int] = {}
+    if await get_plan(session, member.user_id) == Plan.PREMIUM:
+        predicted = await predict_for_import(
+            session,
+            member.ledger_id,
+            [
+                _text(row.values.get("description"))
+                for row in rows
+                if not _text(row.values.get("category")) and _text(row.values.get("description"))
+            ],
+        )
+
     built: list[Transaction] = []
     errors: list[ImportRowError] = []
     for row in rows:
         try:
-            built.append(_build(row, lookup, member))
+            built.append(_build(row, lookup, member, predicted))
         except DomainError as exc:
             errors.append(ImportRowError(row=row.number, message=exc.message))
 

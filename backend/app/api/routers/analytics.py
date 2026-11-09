@@ -4,10 +4,11 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 
 from app.api.deps import Membership, SessionDep
-from app.models.enums import TransactionType
+from app.models.enums import Plan, TransactionType
 from app.schemas.insights import Insights
 from app.schemas.transaction import AnalyticsSummary, AuthorTotal, CategoryTotal, MonthTotal
 from app.services import analytics as analytics_service
+from app.services import billing
 from app.services.insights import build_insights
 
 router = APIRouter(prefix="/ledgers/{ledger_id}/analytics", tags=["analytics"])
@@ -68,4 +69,5 @@ async def monthly(
 async def insights(
     member: Membership, session: SessionDep, currency: Currency = "RUB"
 ) -> Insights:
-    return await build_insights(session, member.ledger_id, currency)
+    use_ml = await billing.get_plan(session, member.user_id) == Plan.PREMIUM
+    return await build_insights(session, member.ledger_id, currency, use_ml=use_ml)

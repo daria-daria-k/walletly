@@ -1,6 +1,7 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, errorText } from '../api/client';
-import type { Transaction, TxType } from '../api/types';
+import type { CategorySuggestion, Transaction, TxType } from '../api/types';
+import { useAuth } from '../auth';
 import { useAccounts, useCategoryGroups, useRefreshLedgerData } from '../lib/data';
 import { isoDate } from '../lib/format';
 import { useLedger } from '../ledger';
@@ -33,6 +34,29 @@ export function TransactionModal({ transaction, preset, onClose }: { transaction
   const [saved, setSaved] = useState(false);
 
   const visibleGroups = groups.filter((group) => group.type === type);
+  const { user } = useAuth();
+  const [suggestion, setSuggestion] = useState<CategorySuggestion | null>(null);
+  // Выбор человека важнее подсказки: после него категорию больше не подменяем
+  const categoryPicked = useRef(Boolean(transaction));
+
+  useEffect(() => {
+    const text = description.trim();
+    if (user?.plan !== 'premium' || type === 'transfer' || text.length < 3 || categoryPicked.current) return;
+    // Пауза: не отправляем запрос на каждую нажатую букву
+    const timer = window.setTimeout(() => {
+      api<CategorySuggestion | null>(`${base}/ml/suggest-category`, { method: 'POST', body: { description: text } })
+        .then((found) => {
+          const known = found && visibleGroups.some((group) => group.categories.some((item) => item.id === found.category_id));
+          if (!found || !known || categoryPicked.current) return;
+          setSuggestion(found);
+          setCategoryId(String(found.category_id));
+        })
+        .catch(() => undefined); // подсказка необязательна, форма работает и без неё
+    }, 500);
+    return () => window.clearTimeout(timer);
+    // visibleGroups пересоздаётся при каждом рендере и зависит только от type
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [description, type, user?.plan, base]);
   const effectiveAccount = accountId || String(accounts[0]?.id ?? '');
   const currency = accounts.find((a) => String(a.id) === effectiveAccount)?.currency ?? 'RUB';
 
@@ -61,6 +85,10 @@ export function TransactionModal({ transaction, preset, onClose }: { transaction
     try {
       if (transaction) await api(`${base}/transactions/${transaction.id}`, { method: 'PATCH', body });
       else await api(`${base}/transactions`, { method: 'POST', body });
+      if (suggestion && body.category_id) {
+        // Что человек оставил в итоге — главный показатель для сравнения моделей
+        api(`${base}/ml/suggestions/${suggestion.suggestion_id}/outcome`, { method: 'POST', body: { category_id: body.category_id } }).catch(() => undefined);
+      }
       await refresh();
       setSaved(true);
       window.setTimeout(onClose, 900); // успех должен быть заметен, прежде чем окно закроется
@@ -111,7 +139,7 @@ export function TransactionModal({ transaction, preset, onClose }: { transaction
           ) : (
             <label>
               Категория
-              <StyledSelect ariaLabel="Категория" value={categoryId} onChange={setCategoryId} groups={visibleGroups.map((group) => ({ label: group.name, options: group.categories.filter((c) => c.is_active || String(c.id) === categoryId).map((c) => ({ value: String(c.id), label: c.name })) }))} />
+              <StyledSelect ariaLabel="Категория" value={categoryId} onChange={(value) => { categoryPicked.current = true; setCategoryId(value); }} groups={visibleGroups.map((group) => ({ label: group.name, options: group.categories.filter((c) => c.is_active || String(c.id) === categoryId).map((c) => ({ value: String(c.id), label: c.name })) }))} />
             </label>
           )}
         </div>
@@ -123,6 +151,7 @@ export function TransactionModal({ transaction, preset, onClose }: { transaction
           Дата
           <input type="date" value={txDate} onChange={(e) => setTxDate(e.target.value)} required />
         </label>
+        {suggestion && String(suggestion.category_id) === categoryId && <p className="ml-hint">Категорию подобрал Walletly AI, её можно изменить</p>}
         <ErrorNote text={accounts.length === 0 ? 'Сначала добавьте счёт на странице «Счета»' : error} />
         <button className="primary-button submit" type="submit" disabled={saving || accounts.length === 0}>
           {saved ? 'Сохранено ✓' : saving ? 'Сохраняем…' : transaction ? 'Сохранить' : SUBMIT_LABEL[type]}
