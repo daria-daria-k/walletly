@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.limits import BusyLimiter
 from app.core.security import (
     create_access_token,
     generate_refresh_token,
@@ -54,6 +55,21 @@ _EMAIL_TOKEN_TTL = {
 }
 
 
+# Argon2 занимает около 64 МБ на каждый хеш: 40 одновременных запросов съедали 2,5 ГБ памяти
+_argon = BusyLimiter(4, 10, "Сервер сейчас перегружен. Попробуйте через минуту")
+
+
+async def _hash(password: str) -> str:
+    # Отдельный поток: Argon2 нагружает CPU и иначе заблокировал бы event loop
+    async with _argon.slot():
+        return await run_in_threadpool(hash_password, password)
+
+
+async def _verify(password: str, password_hash: str) -> bool:
+    async with _argon.slot():
+        return await run_in_threadpool(verify_password, password, password_hash)
+
+
 @dataclass(frozen=True)
 class TokenPair:
     access_token: str
@@ -72,8 +88,7 @@ async def register_user(session: AsyncSession, data: RegisterRequest) -> User:
     if await session.scalar(select(User.id).where(User.email == data.email)):
         raise EmailAlreadyRegisteredError
 
-    # Argon2 нагружает CPU — выносим в отдельный поток, чтобы не блокировать event loop
-    password_hash = await run_in_threadpool(hash_password, data.password)
+    password_hash = await _hash(data.password)
 
     user = User(email=data.email, password_hash=password_hash, name=data.name)
     ledger = Ledger(name="Личное", type=LedgerType.PERSONAL, owner=user)
@@ -129,9 +144,9 @@ async def change_password(
     session: AsyncSession, user: User, current_password: str, new_password: str
 ) -> TokenPair:
     """Меняет пароль и завершает все сессии: если пароль утёк, вор потеряет доступ."""
-    if not await run_in_threadpool(verify_password, current_password, user.password_hash):
+    if not await _verify(current_password, user.password_hash):
         raise InvalidCredentialsError
-    user.password_hash = await run_in_threadpool(hash_password, new_password)
+    user.password_hash = await _hash(new_password)
     await revoke_all_refresh_tokens(session, user.id)
     return await issue_tokens(session, user.id)
 
@@ -192,7 +207,7 @@ async def find_active_user_by_email(session: AsyncSession, email: str) -> User |
 
 async def reset_password(session: AsyncSession, token: str, new_password: str) -> None:
     user = await _consume_email_token(session, token, EmailTokenPurpose.PASSWORD_RESET)
-    user.password_hash = await run_in_threadpool(hash_password, new_password)
+    user.password_hash = await _hash(new_password)
     # Сброс часто означает, что доступ потерян или украден, — закрываем все устройства
     await revoke_all_refresh_tokens(session, user.id)
     # Письмо пришло на этот адрес, значит, он настоящий
@@ -231,7 +246,7 @@ async def authenticate(session: AsyncSession, email: str, password: str) -> User
     # Пароль проверяем, даже если пользователя нет. Иначе ответ для незнакомого email
     # придёт на ~50 мс быстрее, и по времени можно выяснить, кто зарегистрирован
     password_hash = user.password_hash if user else _dummy_password_hash()
-    password_ok = await run_in_threadpool(verify_password, password, password_hash)
+    password_ok = await _verify(password, password_hash)
 
     if user is None or not password_ok:
         raise InvalidCredentialsError

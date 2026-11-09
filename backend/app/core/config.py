@@ -1,3 +1,4 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import URL
 
@@ -46,6 +47,15 @@ class Settings(BaseSettings):
     # Токен выдаёт @BotFather. Пусто — бот выключен
     telegram_bot_token: str = ""
     telegram_bot_username: str = ""
+
+    @field_validator("jwt_secret")
+    @classmethod
+    def _secret_is_strong(cls, value: str) -> str:
+        # Лучше не запуститься, чем работать с change-me из образца: зная секрет,
+        # любой выпустит себе токен администратора
+        if len(value) < 32:
+            raise ValueError("JWT_SECRET слишком короткий. Сгенерируйте: openssl rand -hex 32")
+        return value
 
     @property
     def database_url(self) -> URL:

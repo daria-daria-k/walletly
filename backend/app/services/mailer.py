@@ -23,7 +23,11 @@ def _send_smtp(message: EmailMessage) -> None:
 async def send_mail(to: str, subject: str, body: str) -> None:
     """Вызывается в фоне, после ответа клиенту: ошибку показать уже некому, поэтому только лог."""
     if not settings.smtp_host:
-        logger.warning("SMTP не настроен. Письмо для %s: %s\n%s", to, subject, body)
+        if settings.cookie_secure:
+            # На сервере тело письма в лог не пишем: в нём ссылка для сброса пароля
+            logger.error("SMTP не настроен, письмо для %s не отправлено: %s", to, subject)
+        else:
+            logger.warning("SMTP не настроен. Письмо для %s: %s\n%s", to, subject, body)
         return
 
     message = EmailMessage()

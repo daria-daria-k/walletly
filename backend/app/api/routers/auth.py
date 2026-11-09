@@ -58,7 +58,16 @@ LOGIN_LIMIT_PAIR = 10
 # Отдельный лимит на адрес ловит перебор многих email. Он выше: за одним адресом бывает целый офис
 LOGIN_LIMIT_IP = 100
 FORGOT_WINDOW_SECONDS = 60 * 60
-FORGOT_LIMIT = 3
+# Счётчик только по email позволил бы постороннему за три запроса лишить владельца письма.
+# Поэтому владелец с другого адреса не страдает от чужих запросов, а общий лимит на email
+# выше и защищает от рассылки на один ящик с разных адресов
+FORGOT_LIMIT_PAIR = 3
+FORGOT_LIMIT_EMAIL = 10
+FORGOT_LIMIT_IP = 20
+VERIFY_LIMIT = 3
+# Каждая регистрация стоит хеша Argon2 и письма на указанный адрес
+REGISTER_WINDOW_SECONDS = 60 * 60
+REGISTER_LIMIT_IP = 10
 
 
 def _client_ip(request: Request) -> str:
@@ -87,8 +96,14 @@ def _delete_refresh_cookie(response: Response) -> None:
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(
-    data: RegisterRequest, session: SessionDep, background: BackgroundTasks
+    data: RegisterRequest, session: SessionDep, background: BackgroundTasks, request: Request
 ) -> UserRead:
+    key = f"register:ip:{_client_ip(request)}"
+    if await rate_limit.is_blocked(key, REGISTER_LIMIT_IP):
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS, "Слишком много регистраций. Попробуйте позже"
+        )
+    await rate_limit.hit(key, REGISTER_WINDOW_SECONDS)
     # Роутер переводит ошибки сервиса на язык HTTP — сам сервис про HTTP ничего не знает
     try:
         user = await register_user(session, data)
@@ -127,13 +142,23 @@ async def login(
 
 @router.post("/forgot-password", status_code=status.HTTP_204_NO_CONTENT)
 async def forgot_password(
-    data: ForgotPasswordRequest, session: SessionDep, background: BackgroundTasks
+    data: ForgotPasswordRequest,
+    session: SessionDep,
+    background: BackgroundTasks,
+    request: Request,
 ) -> None:
     # Ответ всегда одинаковый: по нему нельзя узнать, кто зарегистрирован
-    key = f"forgot:{data.email}"
-    if await rate_limit.is_blocked(key, FORGOT_LIMIT):
-        return
-    await rate_limit.hit(key, FORGOT_WINDOW_SECONDS)
+    ip = _client_ip(request)
+    limits = {
+        f"forgot:pair:{ip}:{data.email}": FORGOT_LIMIT_PAIR,
+        f"forgot:email:{data.email}": FORGOT_LIMIT_EMAIL,
+        f"forgot:ip:{ip}": FORGOT_LIMIT_IP,
+    }
+    for key, limit in limits.items():
+        if await rate_limit.is_blocked(key, limit):
+            return
+    for key in limits:
+        await rate_limit.hit(key, FORGOT_WINDOW_SECONDS)
     user = await find_active_user_by_email(session, data.email)
     if user is not None:
         token = await create_email_token(session, user.id, EmailTokenPurpose.PASSWORD_RESET)
@@ -167,7 +192,7 @@ async def resend_verification(
     if user.email_verified_at is not None:
         return
     key = f"verify:{user.id}"
-    if await rate_limit.is_blocked(key, FORGOT_LIMIT):
+    if await rate_limit.is_blocked(key, VERIFY_LIMIT):
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Письмо уже отправлено, проверьте почту")
     await rate_limit.hit(key, FORGOT_WINDOW_SECONDS)
     token = await create_email_token(session, user.id, EmailTokenPurpose.EMAIL_VERIFICATION)

@@ -1,9 +1,11 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+import asyncpg
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.responses import JSONResponse
 from prometheus_fastapi_instrumentator import Instrumentator
+from sqlalchemy.exc import DBAPIError
 
 from app.api.routers import (
     accounts,
@@ -56,6 +58,15 @@ _ERROR_STATUS = {
 async def domain_error_handler(request: Request, exc: DomainError) -> JSONResponse:
     # Одно место перевода ошибок сервисов в HTTP вместо try/except в каждом эндпоинте
     return JSONResponse({"detail": exc.message}, status_code=_ERROR_STATUS[type(exc)])
+
+
+@app.exception_handler(DBAPIError)
+async def database_error_handler(request: Request, exc: DBAPIError) -> JSONResponse:
+    # Значение прошло проверку схемы, но база его не принимает: NUL-символ в строке или
+    # число больше её типа. Это ошибка запроса, а не сбой сервера. Настоящие сбои идут дальше
+    if isinstance(exc.orig.__cause__, asyncpg.exceptions.DataError):
+        return JSONResponse({"detail": "Недопустимое значение в запросе"}, status_code=422)
+    raise exc
 
 
 # Единый префикс: фронт и API живут на одном домене, прокси отправляет /api/* в бэкенд.
