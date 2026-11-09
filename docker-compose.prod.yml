@@ -1,0 +1,49 @@
+# Сервер: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# Подробная инструкция — docs/deploy.md
+services:
+  api:
+    environment:
+      COOKIE_SECURE: "true"
+      APP_URL: https://${DOMAIN}
+
+  worker:
+    environment:
+      APP_URL: https://${DOMAIN}
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: walletly-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+
+  backup:
+    image: postgres:17-alpine
+    container_name: walletly-backup
+    restart: unless-stopped
+    environment:
+      PGHOST: db
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB}
+      KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+    volumes:
+      - ./deploy/backup-loop.sh:/backup-loop.sh:ro
+      - ./backups:/backups
+    command: ["sh", "/backup-loop.sh"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  caddy_data:
+  caddy_config:

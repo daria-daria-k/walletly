@@ -52,13 +52,19 @@ backend/            FastAPI + async SQLAlchemy + PostgreSQL, менеджер п
   app/services/     бизнес-логика (не знает про HTTP)
   app/api/routers/  эндпоинты: переводят ошибки сервисов в HTTP-ответы
   app/api/deps.py   зависимости FastAPI (сессия БД, текущий пользователь)
+  app/ml/           модели категорий, прогноз, аномалии, обучение
+  app/worker.py     фоновые задачи по расписанию, отдельный процесс
+  app/bot.py        Telegram-бот, отдельный процесс
   migrations/       Alembic
   tests/            pytest, отдельная тестовая БД walletly_test
-docs/               решения по архитектуре: db-schema.md, auth.md, api.md; идеи на будущее: backlog.md
+docs/               решения по архитектуре: db-schema.md, auth.md, api.md; запуск на сервере: deploy.md; идеи на будущее: backlog.md
 frontend/           рабочий интерфейс: Vite + React + TanStack Query, nginx в Docker
 frontent/           старый прототип (vinext) — отдельный git-репозиторий,
                     карта экранов в frontent/PRODUCT_PAGES.md
-docker-compose.yml  PostgreSQL 17
+deploy/             Caddy, бэкапы и восстановление, настройки мониторинга
+.github/workflows/  CI и ручной выкат
+docker-compose.yml  приложение: db, redis, api, worker, bot, web; профили ml и monitoring
+docker-compose.prod.yml  добавка для сервера: HTTPS и бэкапы
 ```
 
 ### Команды
@@ -66,7 +72,10 @@ docker-compose.yml  PostgreSQL 17
 ```bash
 docker compose up -d --build                # всё приложение: http://localhost:8080
 docker exec walletly-api python -m app.seed # демо-данные, логины напечатает команда
-docker compose up -d db                     # только БД, для разработки
+docker compose up -d db redis               # только БД и Redis, для разработки
+docker compose --profile ml up -d mlflow    # журнал экспериментов: http://localhost:5001
+docker compose --profile monitoring up -d   # Prometheus и Grafana
+docker exec walletly-worker python -m app.ml.train  # обучить модели вручную
 cd backend
 uv run uvicorn app.main:app --reload        # запустить API без Docker
 uv run pytest                               # тесты
@@ -90,7 +99,7 @@ npm run dev                                 # фронт на Vite, API_URL — 
 
 ## Текущий статус
 
-Этапы 1–2 собраны в ветке `mvp` (backend, фронт, запуск в Docker). Решения сборки — в `docs/api.md`, все «разобрать».
+Весь план (этапы 1–5 и копилка) собран в ветке `mvp`. Настоящего выката не было: сервера и домена пока нет, ЮKassa, Telegram и почта без ключей не проверены. Решения сборки — в `docs/api.md`, все «разобрать».
 
 Не разобраны со мной (идём по `git log` снизу вверх, один коммит — одно занятие):
 1. Вход, обновление сессии, выход (вопросы уже заданы, ответов пока нет).
@@ -101,5 +110,12 @@ npm run dev                                 # фронт на Vite, API_URL — 
 6. Импорт Excel/CSV.
 7. Фронтенд: клиент API, refresh между вкладками, экраны.
 8. Docker: сборка, nginx, compose.
+9. Redis, лимиты входа, сброс пароля, подтверждение email, фоновые задачи.
+10. Копилка.
+11. Уведомления и PWA.
+12. Оплата ЮKassa и тариф Free.
+13. ML: категории, прогноз, аномалии, A/B-тест.
+14. Telegram-бот и PDF-выписки.
+15. Деплой: Caddy, бэкапы, CI/CD, мониторинг.
 
-Дальше, после разбора: этап 3 (деплой, HTTPS, бэкапы), затем ML и оплата.
+Дальше, после разбора: сервер и домен, боевые ключи ЮKassa, настоящий выкат.

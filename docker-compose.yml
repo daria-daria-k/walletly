@@ -8,7 +8,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      # 127.0.0.1: порт доступен только с этого компьютера. Docker обходит правила фаервола,
+      # поэтому без адреса база на сервере оказалась бы открыта всему интернету
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -38,7 +40,7 @@ services:
       POSTGRES_PORT: "5432"
       REDIS_URL: redis://redis:6379/0
     ports:
-      - "${API_PORT:-8000}:8000"
+      - "127.0.0.1:${API_PORT:-8000}:8000"
     depends_on:
       db:
         condition: service_healthy
@@ -77,9 +79,46 @@ services:
     container_name: walletly-web
     restart: unless-stopped
     ports:
-      - "${WEB_PORT:-8080}:80"
+      - "127.0.0.1:${WEB_PORT:-8080}:80"
     depends_on:
       - api
 
+  # Необязательные сервисы включаются профилями: --profile ml, --profile monitoring
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v3.18.0
+    container_name: walletly-mlflow
+    profiles: [ml]
+    restart: unless-stopped
+    command: ["mlflow", "server", "--host", "0.0.0.0", "--port", "5000", "--backend-store-uri", "sqlite:////mlflow/mlflow.db", "--default-artifact-root", "/mlflow/artifacts", "--allowed-hosts", "mlflow:5000,localhost:5001,127.0.0.1:5001"]
+    ports:
+      - "127.0.0.1:5001:5000"
+    volumes:
+      - mlflow:/mlflow
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    container_name: walletly-prometheus
+    profiles: [monitoring]
+    restart: unless-stopped
+    volumes:
+      - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus:/prometheus
+
+  grafana:
+    image: grafana/grafana:12.1.0
+    container_name: walletly-grafana
+    profiles: [monitoring]
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-change-me}
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ./deploy/grafana-datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml:ro
+      - grafana:/var/lib/grafana
+
 volumes:
   pgdata:
+  mlflow:
+  prometheus:
+  grafana:

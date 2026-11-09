@@ -1,0 +1,16 @@
+# Caddy сам получает и продлевает сертификат HTTPS для домена
+{$DOMAIN} {
+	encode gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'"
+	}
+
+	# Заголовок X-Forwarded-For от клиента Caddy отбрасывает и ставит настоящий адрес:
+	# на него опирается ограничение попыток входа
+	reverse_proxy web:80
+}

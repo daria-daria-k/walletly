@@ -1,0 +1,23 @@
+name: Deploy
+
+# Только ручной запуск: выкатка на сервер должна быть осознанным решением
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Обновить приложение на сервере
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -e
+            cd ${{ secrets.DEPLOY_PATH }}
+            git pull --ff-only
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+            sleep 15
+            docker exec walletly-web wget -qO- http://api:8000/api/health

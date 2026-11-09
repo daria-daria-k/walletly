@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.responses import JSONResponse
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from app.api.routers import (
     accounts,
@@ -78,3 +79,6 @@ for module in (
 ):
     api.include_router(module.router)
 app.include_router(api)
+
+# Вне /api: nginx проксирует только /api/, поэтому метрики не видны из интернета
+Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
