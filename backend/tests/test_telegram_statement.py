@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ml.train import train_ledger
 from app.models import Subscription, User
-from app.services import statement, telegram
+from app.services import file_sandbox, statement, telegram
 from tests.test_ml import _fill, _premium
 
 pytestmark = pytest.mark.anyio
@@ -144,7 +144,10 @@ async def test_statement_import_uses_fallback_category(
     await _premium(session, user.id)
     base = f"/api/ledgers/{user.ledger_id}"
     account = (await client.post(f"{base}/accounts", json={"name": "Карта"}, headers=user.headers)).json()
-    monkeypatch.setattr(statement, "extract_text", lambda content: SAMPLE)
+    async def fake_run(kind: str, content: bytes) -> dict:
+        return {"text": SAMPLE}
+
+    monkeypatch.setattr(file_sandbox, "run", fake_run)
 
     url = f"{base}/import/statement"
     params = {"account_id": account["id"]}

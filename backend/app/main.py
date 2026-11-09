@@ -30,6 +30,7 @@ from app.services.errors import (
     InvalidDataError,
     NotFoundError,
     PermissionDeniedError,
+    TooBusyError,
 )
 
 
@@ -47,6 +48,7 @@ _ERROR_STATUS = {
     PermissionDeniedError: 403,
     ConflictError: 409,
     InvalidDataError: 422,
+    TooBusyError: 503,
 }
 
 

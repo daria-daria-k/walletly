@@ -1,12 +1,8 @@
-import csv
-import io
 from collections import Counter
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
-from fastapi.concurrency import run_in_threadpool
-from openpyxl import load_workbook
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -14,7 +10,7 @@ from sqlalchemy.orm import joinedload
 from app.models import Account, Category, CategoryGroup, ImportBatch, LedgerMember, Transaction
 from app.models.enums import CategoryType, Plan, TransactionType
 from app.schemas.imports import ImportResult, ImportRowError
-from app.services import statement
+from app.services import file_sandbox, statement
 from app.services.billing import get_plan
 from app.services.errors import DomainError, InvalidDataError
 from app.services.ml import predict_for_import
@@ -22,7 +18,6 @@ from app.services.scoped import get_in_ledger
 from app.services.transaction import check_fields
 
 MAX_FILE_SIZE = 5 * 1024 * 1024
-MAX_ROWS = 5000
 MAX_AMOUNT = Decimal("9999999999.99")  # предел NUMERIC(12, 2)
 
 _COLUMNS = {
@@ -51,36 +46,9 @@ class ParsedRow:
     values: dict[str, object]
 
 
-def _read_table(content: bytes, filename: str) -> list[tuple[int, list[object]]]:
-    """Возвращает пары (номер строки в файле, ячейки), включая заголовок."""
-    rows: list[tuple[int, list[object]]] = []
-    if filename.lower().endswith(".csv"):
-        # utf-8-sig: Excel сохраняет CSV с BOM, иначе он приклеится к первому заголовку
-        text = content.decode("utf-8-sig")
-        delimiter = ";" if ";" in text.split("\n", 1)[0] else ","
-        source = enumerate(csv.reader(io.StringIO(text), delimiter=delimiter), start=1)
-    else:
-        # read_only — потоковое чтение: большой файл не загружается в память целиком
-        sheet = load_workbook(io.BytesIO(content), read_only=True, data_only=True).worksheets[0]
-        source = enumerate(sheet.iter_rows(values_only=True), start=1)
-
-    for number, cells in source:
-        if all(cell is None or str(cell).strip() == "" for cell in cells):
-            continue
-        rows.append((number, list(cells)))
-        # +1 на заголовок; дальше не читаем — защита от файла-бомбы
-        if len(rows) > MAX_ROWS + 1:
-            raise InvalidDataError(f"В файле больше {MAX_ROWS} строк")
-    return rows
-
-
-def _parse_table(content: bytes, filename: str) -> list[ParsedRow]:
-    try:
-        table = _read_table(content, filename)
-    except DomainError:
-        raise
-    except Exception:  # файл от пользователя: сломан он может быть как угодно
-        raise InvalidDataError("Не удалось прочитать файл. Нужен .xlsx или .csv (UTF-8)") from None
+async def _parse_table(content: bytes, filename: str) -> list[ParsedRow]:
+    kind = "csv" if filename.lower().endswith(".csv") else "xlsx"
+    table = (await file_sandbox.run(kind, content))["rows"]
 
     if not table:
         raise InvalidDataError("Файл пустой")
@@ -239,8 +207,7 @@ def _fingerprint(tx: Transaction) -> tuple:
 async def import_transactions(
     session: AsyncSession, member: LedgerMember, content: bytes, filename: str, *, dry_run: bool
 ) -> ImportResult:
-    # Разбор файла — чистая работа CPU, в event loop он остановил бы все запросы
-    rows = await run_in_threadpool(_parse_table, content, filename)
+    rows = await _parse_table(content, filename)
     return await _import_rows(session, member, rows, filename, dry_run=dry_run)
 
 
@@ -279,7 +246,7 @@ async def import_statement(
     dry_run: bool,
 ) -> ImportResult:
     account = await get_in_ledger(session, Account, member.ledger_id, account_id)
-    text = await run_in_threadpool(statement.extract_text, content)
+    text = (await file_sandbox.run("pdf", content))["text"]
     lines = statement.parse_text(text)
     if not lines:
         raise InvalidDataError("В файле не найдено операций. Возможно, это скан или другой формат")

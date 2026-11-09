@@ -20,3 +20,7 @@ class ConflictError(DomainError):
 
 class InvalidDataError(DomainError):
     pass
+
+
+class TooBusyError(DomainError):
+    """Сервер упёрся в лимит одновременных тяжёлых операций."""
