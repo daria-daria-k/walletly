@@ -1,7 +1,7 @@
 import { Link, Navigate, Outlet, Route, Routes, useLocation, useOutletContext } from 'react-router-dom';
 import { useAuth } from './auth';
 import { Layout } from './components/Layout';
-import { LoadingState, StateCard } from './components/ui';
+import { StateCard, WalletlyPreloader } from './components/ui';
 import { LedgerProvider } from './ledger';
 import { AccountsPage } from './pages/Accounts';
 import { AdminPage } from './pages/Admin';
@@ -35,7 +35,7 @@ function RequireOnboarding() {
 function NotFound() {
   return (
     <div className="state-page" data-theme="violet">
-      <StateCard icon="🔎" title="Страница не найдена" text="Возможно, ссылка устарела или была удалена.">
+      <StateCard type="missing" title="Страница не найдена" text="Возможно, ссылка устарела или была удалена.">
         <Link className="secondary-button" to="/">На главную</Link>
       </StateCard>
     </div>
@@ -52,7 +52,7 @@ function AppShell() {
 
 export function App() {
   const { loading } = useAuth();
-  if (loading) return <div className="state-page" data-theme="violet"><LoadingState /></div>;
+  if (loading) return <WalletlyPreloader />;
 
   return (
     <Routes>

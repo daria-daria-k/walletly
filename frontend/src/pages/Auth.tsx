@@ -48,14 +48,19 @@ function AuthScreen({ mode }: { mode: 'login' | 'register' }) {
     <div className="auth-page auth-page-full" data-theme="violet">
       <div className="auth-layout">
         <section className="auth-story">
-          <div className="brand"><img className="brand-mark" src="/brand/walletly-mark.svg" alt="" /><span>Walletly</span></div>
-          <p>Финансы без лишнего шума</p>
-          <h2>Все счета, расходы и цели — в одном понятном пространстве.</h2>
-          <ul>
-            <li><BadgeCheck size={17} />Данные защищены</li>
-            <li><BadgeCheck size={17} />Настройка за несколько минут</li>
-            <li><BadgeCheck size={17} />Подсказки по вашим расходам</li>
-          </ul>
+          <div className="auth-story-content">
+            <div className="brand"><img className="brand-mark" src="/brand/walletly-mark.svg" alt="" /><span>Walletly</span></div>
+            <p>Финансы без лишнего шума</p>
+            <h2>Все счета, расходы и цели — в одном понятном пространстве.</h2>
+            <ul>
+              <li><BadgeCheck size={17} />Данные защищены</li>
+              <li><BadgeCheck size={17} />Настройка за несколько минут</li>
+              <li><BadgeCheck size={17} />Подсказки по вашим расходам</li>
+            </ul>
+          </div>
+          <div className="auth-coin-backdrop" aria-hidden="true">
+            {['₽', 'W', '$', '€', '₽', '$', 'W', '€', '₽', '$'].map((symbol, index) => <span key={index}>{symbol}</span>)}
+          </div>
         </section>
         <section className="card auth-card">
           <div className="auth-switch">

@@ -162,7 +162,7 @@ export function GoalsPage() {
   return (
     <div className="prototype-page">
       <PageHeading eyebrow="Цели" title="Копилка" subtitle="Копите на важное и смотрите, когда цель будет достигнута." action={canManage ? <button className="primary-button" onClick={() => setEditing('new')}><Plus size={17} />Новая копилка</button> : undefined} />
-      {isLoading ? <LoadingState /> : isError ? <ErrorState onRetry={() => refetch()} /> : goals?.length === 0 ? <StateCard icon="🐷" title="Копилок пока нет" text="Создайте первую: укажите цель и сколько готовы откладывать в месяц." /> : (
+      {isLoading ? <LoadingState /> : isError ? <ErrorState onRetry={() => refetch()} /> : goals?.length === 0 ? <StateCard type="empty" title="Копилок пока нет" text="Создайте первую: укажите цель и сколько готовы откладывать в месяц." /> : (
         <div className="goal-grid">
           {goals?.map((goal) => <GoalCard key={goal.id} goal={goal} canManage={canManage} onEdit={() => setEditing(goal)} onContribute={() => setContributing(goal)} />)}
         </div>

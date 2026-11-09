@@ -81,8 +81,8 @@ export function TransactionsPage() {
           </div>
         )}
         {isLoading ? <LoadingState /> : isError ? <ErrorState onRetry={() => refetch()} /> : data?.items.length === 0 ? (
-          hasFilters ? <StateCard icon="🔎" title="Операций не найдено" text="Измените условия поиска или сбросьте фильтры." /> : (
-            <StateCard icon="📭" title="Пока нет операций" text="Добавьте первую операцию или импортируйте выписку.">
+          hasFilters ? <StateCard type="missing" title="Операций не найдено" text="Измените условия поиска или сбросьте фильтры." /> : (
+            <StateCard type="empty" title="Пока нет операций" text="Добавьте первую операцию или импортируйте выписку.">
               <button className="secondary-button" onClick={() => openAdd()}>Добавить операцию</button>
             </StateCard>
           )

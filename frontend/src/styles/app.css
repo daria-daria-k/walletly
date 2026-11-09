@@ -108,6 +108,8 @@
 /* dvh, а не vh: на телефоне vh не учитывает панель браузера, и низ формы уезжал бы за экран */
 .auth-page-full .auth-layout{width:100%;min-height:100vh;min-height:100dvh;border-radius:0;grid-template-columns:1fr 520px}
 .auth-page-full .auth-story{padding:52px clamp(52px,7vw,120px)}
+/* Размер в пикселях, а не в процентах: на всю ширину окна проценты от колонки унесли бы монеты за экран */
+@media(min-width:901px){.auth-page-full .auth-coin-backdrop{right:-430px;bottom:-1vh;width:clamp(800px,64vw,1240px);height:max(640px,86vh)}}
 /* align-self: карточка остаётся по высоте содержимого, иначе на большом экране внизу пустое белое поле */
 .auth-page-full .auth-card{align-self:center;margin:40px}
 @media(max-width:900px){
@@ -233,3 +235,5 @@
 
 .telegram-row{margin-top:14px}
 .statement-account{display:grid;gap:6px;margin-bottom:12px;font-size:12px;font-weight:700}
+/* Продолжение уже показанного прелоадера: повторное появление выглядело бы как мигание */
+.walletly-preloader.continued{animation:none}

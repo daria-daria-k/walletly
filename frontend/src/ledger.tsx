@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 import { api } from './api/client';
 import type { Ledger } from './api/types';
+import { WalletlyPreloader } from './components/ui';
 
 interface LedgerState {
   ledgers: Ledger[];
@@ -46,7 +47,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     };
   }, [ledgers, selected]);
 
-  if (isLoading) return <div className="state">Загрузка…</div>;
+  if (isLoading) return <WalletlyPreloader continued />;
   if (isError || !value) return <div className="state">Не удалось загрузить данные. Обновите страницу.</div>;
   return <LedgerContext.Provider value={value}>{children}</LedgerContext.Provider>;
 }

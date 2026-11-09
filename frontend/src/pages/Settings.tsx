@@ -5,7 +5,7 @@ import { useSearchParams } from 'react-router-dom';
 import { api, errorText, setAccessToken } from '../api/client';
 import type { NotificationSettings, PaymentItem, PlanInfo } from '../api/types';
 import { useAuth } from '../auth';
-import { THEME_KEY } from '../components/Layout';
+import { THEME_KEY } from '../lib/theme';
 import { ErrorNote, PageHeading } from '../components/ui';
 import { dateTime, initials, money, plural, shortDate } from '../lib/format';
 

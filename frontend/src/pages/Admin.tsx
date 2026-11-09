@@ -182,7 +182,7 @@ function Payments() {
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['admin', 'payments'], queryFn: () => api<AdminPayment[]>('/admin/payments') });
   if (isLoading) return <LoadingState />;
   if (isError) return <ErrorState onRetry={() => refetch()} />;
-  if (!data?.length) return <StateCard icon="💳" title="Платежей пока нет" text="Здесь появятся оплаты подписки." />;
+  if (!data?.length) return <StateCard type="empty" title="Платежей пока нет" text="Здесь появятся оплаты подписки." />;
   return (
     <section className="card">
       {data.map((item) => <div className="audit-row" key={item.id}><small>{dateTime(item.created_at)}</small><span>{item.email} · {money(item.amount)}</span><em>{PAYMENT_LABEL[item.status]}</em></div>)}
@@ -216,7 +216,7 @@ export function AdminPage() {
 
   if (user?.role !== 'admin') {
     return (
-      <StateCard icon="🔒" title="Нет доступа" text="Для просмотра раздела нужны права администратора.">
+      <StateCard type="locked" title="Нет доступа" text="Для просмотра раздела нужны права администратора.">
         <button className="secondary-button" onClick={() => navigate('/')}>Вернуться назад</button>
       </StateCard>
     );

@@ -134,7 +134,7 @@ export function AccountsPage() {
         <div><p>На всех счетах</p><h2>{[...totals].map(([code, sum]) => money(sum, code)).join(' · ') || money(0)}</h2></div>
         <span><label><input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} /> Показать архив</label></span>
       </div>
-      {isLoading ? <LoadingState /> : isError ? <ErrorState onRetry={() => refetch()} /> : accounts?.length === 0 ? <StateCard icon="💳" title="Счетов пока нет" text="Добавьте карту, вклад или наличные, чтобы видеть общий баланс." /> : (
+      {isLoading ? <LoadingState /> : isError ? <ErrorState onRetry={() => refetch()} /> : accounts?.length === 0 ? <StateCard type="empty" title="Счетов пока нет" text="Добавьте карту, вклад или наличные, чтобы видеть общий баланс." /> : (
         <div className="account-grid">
           {accounts?.map((account, index) => (
             <section className="card account-card" key={account.id}>

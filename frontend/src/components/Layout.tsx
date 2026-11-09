@@ -4,10 +4,12 @@ import { Link, NavLink, Outlet, useLocation, useNavigate, useOutletContext } fro
 import type { TxType } from '../api/types';
 import { useAuth } from '../auth';
 import { initials } from '../lib/format';
+import { THEME_KEY, storedTheme } from '../lib/theme';
 import { useLedger } from '../ledger';
 import { NotificationBell } from './NotificationBell';
 import { StyledSelect } from './StyledSelect';
 import { TransactionModal } from './TransactionModal';
+import { FirstLoadPreloader } from './ui';
 
 const NAV = [
   { to: '/', label: 'Обзор', icon: LayoutDashboard },
@@ -23,16 +25,6 @@ const SERVICE_NAV = [
   { to: '/import', label: 'Импорт и экспорт', icon: FileUp },
   { to: '/ai', label: 'Walletly AI', icon: BrainCircuit },
 ];
-
-export const THEME_KEY = 'walletly-theme';
-
-function storedTheme() {
-  try {
-    return localStorage.getItem(THEME_KEY) ?? 'violet';
-  } catch {
-    return 'violet';
-  }
-}
 
 export interface AddPreset {
   type?: TxType;
@@ -87,6 +79,7 @@ export function Layout() {
 
   return (
     <main className="app-shell" data-theme={theme}>
+      <FirstLoadPreloader />
       <aside className={`sidebar ${menuOpen ? 'sidebar-open' : ''}`}>
         <div className="brand"><img className="brand-mark" src="/brand/walletly-mark.svg" alt="" /><span>Walletly</span></div>
         <button className="mobile-close" onClick={closeMenu} aria-label="Закрыть меню"><X /></button>
