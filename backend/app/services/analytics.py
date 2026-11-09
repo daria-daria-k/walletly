@@ -12,7 +12,7 @@ from app.schemas.transaction import AnalyticsSummary, AuthorTotal, CategoryTotal
 _REAL_TYPES = (TransactionType.INCOME, TransactionType.EXPENSE)
 
 
-def _scoped(query, ledger_id: int, currency: str, date_from: date | None, date_to: date | None):
+def scoped_transactions(query, ledger_id: int, currency: str, date_from: date | None, date_to: date | None):
     # Валюту фиксируем явно: сумма рублей и долларов — бессмысленное число
     query = query.join(Account, Transaction.account_id == Account.id).where(
         Transaction.ledger_id == ledger_id,
@@ -34,7 +34,7 @@ async def summary(
     date_to: date | None,
 ) -> AnalyticsSummary:
     rows = await session.execute(
-        _scoped(
+        scoped_transactions(
             select(Transaction.type, func.sum(Transaction.amount))
             .where(Transaction.type.in_(_REAL_TYPES))
             .group_by(Transaction.type),
@@ -60,7 +60,7 @@ async def by_category(
 ) -> list[CategoryTotal]:
     total = func.sum(Transaction.amount)
     rows = await session.execute(
-        _scoped(
+        scoped_transactions(
             select(Category.id, Category.name, CategoryGroup.name, total)
             .join(Category, Transaction.category_id == Category.id)
             .join(CategoryGroup, Category.category_group_id == CategoryGroup.id)
@@ -88,7 +88,7 @@ async def by_author(
 ) -> list[AuthorTotal]:
     total = func.sum(Transaction.amount)
     rows = await session.execute(
-        _scoped(
+        scoped_transactions(
             select(User.id, User.name, total)
             .join(User, Transaction.user_id == User.id)
             .where(Transaction.type == TransactionType.EXPENSE)
@@ -112,7 +112,7 @@ async def monthly(
 ) -> list[MonthTotal]:
     month = func.to_char(Transaction.tx_date, "YYYY-MM")
     rows = await session.execute(
-        _scoped(
+        scoped_transactions(
             select(month, Transaction.type, func.sum(Transaction.amount))
             .where(Transaction.type.in_(_REAL_TYPES))
             .group_by(month, Transaction.type)

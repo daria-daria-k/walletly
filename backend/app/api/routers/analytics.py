@@ -5,8 +5,10 @@ from fastapi import APIRouter, Query
 
 from app.api.deps import Membership, SessionDep
 from app.models.enums import TransactionType
+from app.schemas.insights import Insights
 from app.schemas.transaction import AnalyticsSummary, AuthorTotal, CategoryTotal, MonthTotal
 from app.services import analytics as analytics_service
+from app.services.insights import build_insights
 
 router = APIRouter(prefix="/ledgers/{ledger_id}/analytics", tags=["analytics"])
 
@@ -60,3 +62,10 @@ async def monthly(
     date_to: date | None = None,
 ) -> list[MonthTotal]:
     return await analytics_service.monthly(session, member.ledger_id, currency, date_from, date_to)
+
+
+@router.get("/insights")
+async def insights(
+    member: Membership, session: SessionDep, currency: Currency = "RUB"
+) -> Insights:
+    return await build_insights(session, member.ledger_id, currency)
