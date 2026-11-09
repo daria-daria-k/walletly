@@ -1,10 +1,12 @@
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Palette, ShieldCheck } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { api, errorText, setAccessToken } from '../api/client';
+import type { NotificationSettings } from '../api/types';
 import { useAuth } from '../auth';
 import { THEME_KEY } from '../components/Layout';
 import { ErrorNote, PageHeading } from '../components/ui';
-import { initials } from '../lib/format';
+import { initials, plural, shortDate } from '../lib/format';
 
 const THEMES = [
   { id: 'violet', name: 'AI Violet', note: 'Технологичная и выразительная', colors: ['#241B4B', '#7C65E8', '#FF6B7A'] },
@@ -15,7 +17,16 @@ const THEMES = [
   { id: 'lime', name: 'Graphite Lime', note: 'Контрастная и смелая', colors: ['#202824', '#B8E455', '#FF7065'] },
 ];
 
-const SECTIONS = ['Профиль', 'Интерфейс', 'Безопасность', 'Подписка'];
+const SECTIONS = ['Профиль', 'Интерфейс', 'Уведомления', 'Безопасность', 'Подписка'];
+
+const NOTIFICATIONS: { key: keyof NotificationSettings; title: string; text: string }[] = [
+  { key: 'budget', title: 'Превышение бюджета', text: 'Когда категория достигает 80% и 100% лимита' },
+  { key: 'unusual', title: 'Необычные траты', text: 'Если расход заметно отличается от привычного' },
+  { key: 'weekly', title: 'Еженедельный отчёт', text: 'Краткая сводка по воскресеньям' },
+  { key: 'family', title: 'Семейная группа', text: 'Новые операции и приглашения участников' },
+];
+
+const BENEFITS = ['Неограниченные счета и операции', 'Семейная группа', 'Подсказки и прогнозы', 'Импорт и экспорт отчётов'];
 
 function currentTheme() {
   try {
@@ -34,6 +45,11 @@ export function SettingsPage() {
   const [newPassword, setNewPassword] = useState('');
   const [passwordNote, setPasswordNote] = useState<{ ok?: string; error?: string }>({});
   const [theme, setTheme] = useState(currentTheme);
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [notifyError, setNotifyError] = useState<string | null>(null);
+  const [sessionsError, setSessionsError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const { data: sessions } = useQuery({ queryKey: ['sessions'], queryFn: () => api<{ active: number }>('/auth/sessions'), enabled: section === 'Безопасность' });
 
   async function saveProfile(event: FormEvent) {
     event.preventDefault();
@@ -59,6 +75,27 @@ export function SettingsPage() {
       setPasswordNote({ ok: 'Пароль изменён. Другие устройства вышли из аккаунта.' });
     } catch (err) {
       setPasswordNote({ error: errorText(err) });
+    }
+  }
+
+  async function toggleNotification(key: keyof NotificationSettings) {
+    if (!user) return;
+    setNotifyError(null);
+    try {
+      await api('/auth/me', { method: 'PATCH', body: { notifications: { ...user.notifications, [key]: !user.notifications[key] } } });
+      await reload();
+    } catch (err) {
+      setNotifyError(errorText(err));
+    }
+  }
+
+  async function revokeOthers() {
+    setSessionsError(null);
+    try {
+      await api('/auth/sessions/revoke-others', { method: 'POST' });
+      await queryClient.invalidateQueries({ queryKey: ['sessions'] });
+    } catch (err) {
+      setSessionsError(errorText(err));
     }
   }
 
@@ -111,25 +148,66 @@ export function SettingsPage() {
           </section>
         )}
 
+        {section === 'Уведомления' && (
+          <section className="card settings-panel">
+            <div className="interface-heading"><span className="reconcile-icon">🔔</span><div><h3>Уведомления</h3><p>Выберите, о каких событиях Walletly должен сообщать.</p></div></div>
+            <div className="toggle-list">
+              {NOTIFICATIONS.map((item) => (
+                <div className="toggle-row" key={item.key}>
+                  <div><b>{item.title}</b><span>{item.text}</span></div>
+                  <button className={user?.notifications[item.key] ? 'enabled' : ''} aria-pressed={user?.notifications[item.key]} aria-label={item.title} onClick={() => toggleNotification(item.key)}><i /></button>
+                </div>
+              ))}
+            </div>
+            <ErrorNote text={notifyError} />
+            <p className="settings-note" style={{ marginTop: 14 }}>Выбор сохраняется. Сами уведомления начнут приходить, когда появится их доставка.</p>
+          </section>
+        )}
+
         {section === 'Безопасность' && (
           <section className="card settings-panel">
-            <div className="interface-heading"><span className="reconcile-icon"><ShieldCheck /></span><div><h3>Смена пароля</h3><p>После смены другие устройства выйдут из аккаунта.</p></div></div>
-            <form onSubmit={changePassword}>
-              <div className="settings-form">
-                <label>Текущий пароль<input type="password" autoComplete="current-password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required /></label>
-                <label>Новый пароль (от 8 символов)<input type="password" autoComplete="new-password" minLength={8} maxLength={128} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required /></label>
+            <div className="interface-heading"><span className="reconcile-icon"><ShieldCheck /></span><div><h3>Безопасность</h3><p>Пароль и активные сессии.</p></div></div>
+            <div className="security-list">
+              <div>
+                <span>🔑</span>
+                <div><b>Пароль</b><small>Не менее 8 символов</small></div>
+                <button className="secondary-button" onClick={() => setChangingPassword(!changingPassword)}>Изменить</button>
               </div>
-              <div className="settings-actions"><button className="primary-button">Изменить пароль</button></div>
-              <ErrorNote text={passwordNote.error} />
-              {passwordNote.ok && <p className="form-ok">{passwordNote.ok}</p>}
-            </form>
+              {changingPassword && (
+                <form className="security-form" onSubmit={changePassword}>
+                  <div className="settings-form">
+                    <label>Текущий пароль<input type="password" autoComplete="current-password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required /></label>
+                    <label>Новый пароль<input type="password" autoComplete="new-password" minLength={8} maxLength={128} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required /></label>
+                  </div>
+                  <div className="settings-actions"><button className="primary-button">Изменить пароль</button></div>
+                </form>
+              )}
+              <div>
+                <span>💻</span>
+                <div><b>Активные сессии</b><small>{sessions ? plural(sessions.active, 'устройство', 'устройства', 'устройств') : '…'}</small></div>
+                <button className="secondary-button" disabled={!sessions || sessions.active < 2} onClick={revokeOthers}>Завершить другие</button>
+              </div>
+            </div>
+            <ErrorNote text={passwordNote.error ?? sessionsError} />
+            {passwordNote.ok && <p className="form-ok">{passwordNote.ok}</p>}
           </section>
         )}
 
         {section === 'Подписка' && (
-          <section className="card settings-panel">
-            <h3 className="settings-panel-title">Тариф: {user?.plan === 'premium' ? 'Premium' : 'Free'}</h3>
-            <p className="settings-note">Оплата подключится на этапе 5. Сейчас тариф меняет администратор.</p>
+          <section className="card settings-panel subscription-settings">
+            <div className="subscription-current">
+              <div>
+                <small>Текущий тариф</small>
+                <h3>Walletly {user?.plan === 'premium' ? 'Premium' : 'Free'}</h3>
+                <p>{user?.plan_expires_at ? `Активен до ${shortDate(user.plan_expires_at.slice(0, 10))}` : 'Бессрочно'}</p>
+              </div>
+              <span>{user?.plan === 'premium' ? 'PREMIUM' : 'FREE'}</span>
+            </div>
+            <div className="plan-benefits">
+              <b>В тариф включено</b>
+              <ul>{BENEFITS.map((item) => <li key={item}><Check />{item}</li>)}</ul>
+            </div>
+            <div className="billing-row"><div><b>Оплата пока не подключена</b><span>Сейчас тариф меняет администратор</span></div></div>
           </section>
         )}
       </div>

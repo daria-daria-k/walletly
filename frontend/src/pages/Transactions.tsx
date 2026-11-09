@@ -2,12 +2,13 @@ import { useQuery } from '@tanstack/react-query';
 import { Filter, MoreHorizontal, Plus, Search, Upload } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { api, errorText } from '../api/client';
-import type { Summary, Transaction, TransactionPage, TxType } from '../api/types';
+import { api } from '../api/client';
+import type { Summary, Transaction, TransactionPage } from '../api/types';
 import { useAuth } from '../auth';
 import { useAddOperation } from '../components/Layout';
 import { TransactionModal } from '../components/TransactionModal';
-import { ErrorNote, Metric, PageHeading, State } from '../components/ui';
+import { StyledSelect } from '../components/StyledSelect';
+import { ErrorState, LoadingState, Metric, PageHeading, StateCard } from '../components/ui';
 import { useAccounts, useCategoryGroups } from '../lib/data';
 import { categoryEmoji, money, monthRange, monthTitle, shortDate, signedMoney } from '../lib/format';
 import { useLedger } from '../ledger';
@@ -37,7 +38,7 @@ export function TransactionsPage() {
   const month = monthRange();
   const { data: summary } = useQuery({ queryKey: [base, 'summary', month], queryFn: () => api<Summary>(`${base}/analytics/summary`, { query: month }) });
   const query = { ...filters, limit: PAGE_SIZE, offset };
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: [base, 'transactions', query],
     queryFn: () => api<TransactionPage>(`${base}/transactions`, { query }),
   });
@@ -47,6 +48,7 @@ export function TransactionsPage() {
   const activeFilters = [filters.account_id, filters.category_id, filters.date_from, filters.date_to].filter(Boolean).length;
   const monthName = monthTitle().split(' ')[0];
   const net = Number(summary?.net ?? 0);
+  const hasFilters = activeFilters > 0 || Boolean(filters.search || filters.type);
 
   function setFilter(name: keyof typeof filters, value: string) {
     setFilters((current) => ({ ...current, [name]: value }));
@@ -66,27 +68,25 @@ export function TransactionsPage() {
       <section className="card data-card">
         <div className="filterbar">
           <div className="filter-search"><Search size={17} /><input aria-label="Поиск по описанию" placeholder="Название или описание" value={filters.search} onChange={(e) => setFilter('search', e.target.value)} /></div>
-          <select aria-label="Тип" value={filters.type} onChange={(e) => setFilter('type', e.target.value as TxType | '')}>
-            <option value="">Все операции</option><option value="expense">Расходы</option><option value="income">Доходы</option><option value="transfer">Переводы</option>
-          </select>
+          <StyledSelect ariaLabel="Тип" value={filters.type} onChange={(value) => setFilter('type', value)} options={[{ value: '', label: 'Все операции' }, { value: 'expense', label: 'Расходы' }, { value: 'income', label: 'Доходы' }, { value: 'transfer', label: 'Переводы' }]} />
           <button onClick={() => setShowFilters(!showFilters)} aria-expanded={showFilters}><Filter size={16} />Фильтры {activeFilters > 0 && <span className="filter-count">{activeFilters}</span>}</button>
           <button onClick={() => navigate('/import')}><Upload size={16} />Импорт</button>
         </div>
         {showFilters && (
           <div className="filter-panel">
-            <select aria-label="Счёт" value={filters.account_id} onChange={(e) => setFilter('account_id', e.target.value)}>
-              <option value="">Все счета</option>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </select>
-            <select aria-label="Категория" value={filters.category_id} onChange={(e) => setFilter('category_id', e.target.value)}>
-              <option value="">Все категории</option>
-              {groups.map((group) => <optgroup key={group.id} label={group.name}>{group.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</optgroup>)}
-            </select>
+            <StyledSelect ariaLabel="Счёт" value={filters.account_id} onChange={(value) => setFilter('account_id', value)} options={[{ value: '', label: 'Все счета' }, ...accounts.map((a) => ({ value: String(a.id), label: a.name }))]} />
+            <StyledSelect ariaLabel="Категория" value={filters.category_id} onChange={(value) => setFilter('category_id', value)} options={[{ value: '', label: 'Все категории' }]} groups={groups.map((group) => ({ label: group.name, options: group.categories.map((c) => ({ value: String(c.id), label: c.name })) }))} />
             <input aria-label="С даты" type="date" value={filters.date_from} onChange={(e) => setFilter('date_from', e.target.value)} />
             <input aria-label="По дату" type="date" value={filters.date_to} onChange={(e) => setFilter('date_to', e.target.value)} />
           </div>
         )}
-        <ErrorNote text={error ? errorText(error) : null} />
-        {isLoading ? <State>Загрузка…</State> : data?.items.length === 0 ? <State>Операций не найдено</State> : (
+        {isLoading ? <LoadingState /> : isError ? <ErrorState onRetry={() => refetch()} /> : data?.items.length === 0 ? (
+          hasFilters ? <StateCard icon="🔎" title="Операций не найдено" text="Измените условия поиска или сбросьте фильтры." /> : (
+            <StateCard icon="📭" title="Пока нет операций" text="Добавьте первую операцию или импортируйте выписку.">
+              <button className="secondary-button" onClick={() => openAdd()}>Добавить операцию</button>
+            </StateCard>
+          )
+        ) : (
           <div className="transaction-table">
             <div className="table-head"><span>Дата</span><span>Операция</span><span>Категория</span><span>Счёт</span><span>Сумма</span><span /></div>
             {data?.items.map((tx) => {

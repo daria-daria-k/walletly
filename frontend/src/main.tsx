@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { App } from './App';
 import { AuthProvider } from './auth';
+import { CrashBoundary } from './components/ui';
 import './styles/prototype.css';
 import './styles/app.css';
 
@@ -12,6 +13,7 @@ const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false,
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
+    <CrashBoundary>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AuthProvider>
@@ -19,5 +21,6 @@ createRoot(document.getElementById('root')!).render(
         </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>
+    </CrashBoundary>
   </StrictMode>,
 );

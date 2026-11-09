@@ -1,10 +1,11 @@
-import { Bell, CreditCard, LayoutDashboard, LineChart, LogOut, Menu, Palette, Plus, ReceiptText, Search, Settings, Shield, Users, X, ChevronDown } from 'lucide-react';
+import { Bell, BrainCircuit, CreditCard, FileUp, LayoutDashboard, LineChart, LogOut, Menu, Palette, Plus, ReceiptText, Search, Settings, ShieldCheck, Users, X } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 import type { TxType } from '../api/types';
 import { useAuth } from '../auth';
 import { initials } from '../lib/format';
 import { useLedger } from '../ledger';
+import { StyledSelect } from './StyledSelect';
 import { TransactionModal } from './TransactionModal';
 
 const NAV = [
@@ -14,6 +15,11 @@ const NAV = [
   { to: '/accounts', label: 'Счета', icon: CreditCard },
   { to: '/categories', label: 'Категории', icon: Palette },
   { to: '/family', label: 'Семья', icon: Users },
+];
+
+const SERVICE_NAV = [
+  { to: '/import', label: 'Импорт и экспорт', icon: FileUp },
+  { to: '/ai', label: 'Walletly AI', icon: BrainCircuit },
 ];
 
 export const THEME_KEY = 'walletly-theme';
@@ -63,6 +69,11 @@ export function Layout() {
     };
   }, []);
 
+  useEffect(() => {
+    // Выпадающие списки рисуются в body, вне .app-shell, и должны видеть те же цвета темы
+    document.documentElement.dataset.theme = theme;
+  }, [theme]);
+
   const closeMenu = () => setMenuOpen(false);
   const link = ({ isActive }: { isActive: boolean }) => (isActive ? 'active' : '');
 
@@ -83,19 +94,23 @@ export function Layout() {
               <Icon size={19} /><span>{label}</span>
             </NavLink>
           ))}
-          {user?.role === 'admin' && (
-            <NavLink to="/admin" className={link} onClick={closeMenu}><Shield size={19} /><span>Админка</span></NavLink>
-          )}
         </nav>
         <div className="nav-divider" />
         <p className="nav-caption">Пространство</p>
-        <label className="family-chip">
+        <div className="family-chip">
           <Users size={19} />
-          <select aria-label="Текущее пространство" value={ledger.id} onChange={(e) => select(Number(e.target.value))}>
-            {ledgers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-          </select>
-          <ChevronDown size={16} />
-        </label>
+          <StyledSelect ariaLabel="Текущее пространство" value={String(ledger.id)} onChange={(value) => select(Number(value))} options={ledgers.map((item) => ({ value: String(item.id), label: item.name }))} />
+        </div>
+        <div className="nav-divider" />
+        <p className="nav-caption">Дополнительно</p>
+        <nav className="nav-list service-nav" aria-label="Дополнительные разделы">
+          {SERVICE_NAV.map(({ to, label, icon: Icon }) => (
+            <NavLink key={to} to={to} className={link} onClick={closeMenu}><Icon size={18} /><span>{label}</span></NavLink>
+          ))}
+          {user?.role === 'admin' && (
+            <NavLink to="/admin" className={link} onClick={closeMenu}><ShieldCheck size={18} /><span>Администратор</span></NavLink>
+          )}
+        </nav>
         <div className="sidebar-bottom">
           <NavLink to="/settings" className={link} onClick={closeMenu}><Settings size={19} />Настройки</NavLink>
           <div className="profile-mini">
@@ -121,12 +136,15 @@ export function Layout() {
           </div>
         </header>
         <div className="content"><Outlet context={{ openAdd: (preset: AddPreset = {}) => setAdding(preset) }} /></div>
-        <nav className="mobile-nav" aria-label="Мобильная навигация">
-          {NAV.slice(0, 4).map(({ to, label, icon: Icon }) => (
-            <button key={to} className={pathname === to ? 'active' : ''} onClick={() => navigate(to)}><Icon size={20} /><span>{label}</span></button>
-          ))}
-          <button onClick={() => setAdding({})}><span className="mobile-add"><Plus /></span><span>Добавить</span></button>
-        </nav>
+        {/* На онбординге счетов ещё нет: «+» открыл бы пустую форму, а разделы всё равно вернут на настройку */}
+        {pathname !== '/onboarding' && (
+          <nav className="mobile-nav" aria-label="Мобильная навигация">
+            {NAV.slice(0, 4).map(({ to, label, icon: Icon }) => (
+              <button key={to} className={pathname === to ? 'active' : ''} onClick={() => navigate(to)}><Icon size={20} /><span>{label}</span></button>
+            ))}
+            <button onClick={() => setAdding({})}><span className="mobile-add"><Plus /></span><span>Добавить</span></button>
+          </nav>
+        )}
       </section>
       {adding && <TransactionModal preset={adding} onClose={() => setAdding(null)} />}
     </main>

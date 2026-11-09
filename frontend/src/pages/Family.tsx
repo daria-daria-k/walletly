@@ -4,6 +4,7 @@ import { useState, type FormEvent } from 'react';
 import { api, errorText } from '../api/client';
 import type { AuthorTotal, Invitation, Ledger, Member, Summary } from '../api/types';
 import { useAuth } from '../auth';
+import { StyledSelect } from '../components/StyledSelect';
 import { ErrorNote, Modal, PageHeading } from '../components/ui';
 import { useAccounts } from '../lib/data';
 import { initials, money, monthRange, monthTitle, ROLE_LABEL, shortDate } from '../lib/format';
@@ -115,9 +116,7 @@ function SharedSpace({ inviting, onCloseInvite, onInvite }: { inviting: boolean;
               <span>{initials(member.name)}</span>
               <div><b>{member.name}</b><small>{member.email}</small></div>
               {isOwner && member.role !== 'owner' ? (
-                <select aria-label={`Роль: ${member.name}`} value={member.role} onChange={(e) => run(() => api(`${base}/members/${member.user_id}`, { method: 'PATCH', body: { role: e.target.value } }))}>
-                  <option value="member">Участник</option><option value="admin">Администратор</option>
-                </select>
+                <StyledSelect ariaLabel={`Роль: ${member.name}`} value={member.role} onChange={(role) => run(() => api(`${base}/members/${member.user_id}`, { method: 'PATCH', body: { role } }))} options={[{ value: 'member', label: 'Участник' }, { value: 'admin', label: 'Администратор' }]} />
               ) : <em>{ROLE_LABEL[member.role]}</em>}
               {member.role !== 'owner' && (canManage || member.user_id === user?.id) ? (
                 <button className="small-button danger" onClick={() => window.confirm(member.user_id === user?.id ? 'Выйти из пространства?' : `Исключить ${member.name}?`) && run(() => api(`${base}/members/${member.user_id}`, { method: 'DELETE' }), member.user_id === user?.id)}>

@@ -1,16 +1,18 @@
-import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
+import { Link, Navigate, Outlet, Route, Routes, useLocation, useOutletContext } from 'react-router-dom';
 import { useAuth } from './auth';
 import { Layout } from './components/Layout';
-import { State } from './components/ui';
+import { LoadingState, StateCard } from './components/ui';
 import { LedgerProvider } from './ledger';
 import { AccountsPage } from './pages/Accounts';
 import { AdminPage } from './pages/Admin';
+import { AiPage } from './pages/Ai';
 import { AnalyticsPage } from './pages/Analytics';
 import { LoginPage, RegisterPage } from './pages/Auth';
 import { CategoriesPage } from './pages/Categories';
 import { FamilyPage } from './pages/Family';
 import { ImportPage } from './pages/Import';
 import { InvitePage } from './pages/Invite';
+import { OnboardingPage } from './pages/Onboarding';
 import { OverviewPage } from './pages/Overview';
 import { SettingsPage } from './pages/Settings';
 import { TransactionsPage } from './pages/Transactions';
@@ -20,6 +22,23 @@ function RequireAuth() {
   const location = useLocation();
   if (!user) return <Navigate to={`/login?next=${encodeURIComponent(location.pathname)}`} replace />;
   return <Outlet />;
+}
+
+function RequireOnboarding() {
+  const { user } = useAuth();
+  // Контекст Outlet не проходит сквозь вложенные маршруты сам: без этого страницы его не увидят
+  const context = useOutletContext();
+  return user?.onboarding_completed ? <Outlet context={context} /> : <Navigate to="/onboarding" replace />;
+}
+
+function NotFound() {
+  return (
+    <div className="state-page" data-theme="violet">
+      <StateCard icon="🔎" title="Страница не найдена" text="Возможно, ссылка устарела или была удалена.">
+        <Link className="secondary-button" to="/">На главную</Link>
+      </StateCard>
+    </div>
+  );
 }
 
 function AppShell() {
@@ -32,7 +51,7 @@ function AppShell() {
 
 export function App() {
   const { loading } = useAuth();
-  if (loading) return <State>Загрузка…</State>;
+  if (loading) return <div className="state-page" data-theme="violet"><LoadingState /></div>;
 
   return (
     <Routes>
@@ -41,18 +60,22 @@ export function App() {
       <Route element={<RequireAuth />}>
         <Route path="/invite/:token" element={<InvitePage />} />
         <Route element={<AppShell />}>
-          <Route index element={<OverviewPage />} />
-          <Route path="transactions" element={<TransactionsPage />} />
-          <Route path="analytics" element={<AnalyticsPage />} />
-          <Route path="accounts" element={<AccountsPage />} />
-          <Route path="categories" element={<CategoriesPage />} />
-          <Route path="import" element={<ImportPage />} />
-          <Route path="family" element={<FamilyPage />} />
-          <Route path="settings" element={<SettingsPage />} />
-          <Route path="admin" element={<AdminPage />} />
+          <Route path="onboarding" element={<OnboardingPage />} />
+          <Route element={<RequireOnboarding />}>
+            <Route index element={<OverviewPage />} />
+            <Route path="transactions" element={<TransactionsPage />} />
+            <Route path="analytics" element={<AnalyticsPage />} />
+            <Route path="accounts" element={<AccountsPage />} />
+            <Route path="categories" element={<CategoriesPage />} />
+            <Route path="import" element={<ImportPage />} />
+            <Route path="family" element={<FamilyPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+            <Route path="admin" element={<AdminPage />} />
+            <Route path="ai" element={<AiPage />} />
+          </Route>
         </Route>
       </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 }

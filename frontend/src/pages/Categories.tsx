@@ -3,7 +3,8 @@ import { MoreHorizontal, Plus } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { api, errorText } from '../api/client';
 import type { Category, CategoryGroup, CategoryTotal } from '../api/types';
-import { ErrorNote, Modal, PageHeading, State } from '../components/ui';
+import { StyledSelect } from '../components/StyledSelect';
+import { ErrorNote, ErrorState, LoadingState, Modal, PageHeading } from '../components/ui';
 import { useCategoryGroups, useRefreshLedgerData } from '../lib/data';
 import { money, monthRange } from '../lib/format';
 import { useLedger } from '../ledger';
@@ -46,7 +47,7 @@ function GroupModal({ group, onClose }: { group?: CategoryGroup; onClose: () => 
     <Modal eyebrow="Категории" title={group ? 'Изменить группу' : 'Новая группа'} onClose={onClose}>
       <form onSubmit={submit} style={{ marginTop: 16 }}>
         <label>Название<input value={name} onChange={(e) => setName(e.target.value)} maxLength={50} required autoFocus /></label>
-        {!group && <label>Тип<select value={type} onChange={(e) => setType(e.target.value)}><option value="expense">Расходы</option><option value="income">Доходы</option></select></label>}
+        {!group && <label>Тип<StyledSelect ariaLabel="Тип группы" value={type} onChange={setType} options={[{ value: 'expense', label: 'Расходы' }, { value: 'income', label: 'Доходы' }]} /></label>}
         <ErrorNote text={error} />
         <button className="primary-button submit">Сохранить</button>
         {group && <button type="button" className="danger-button" onClick={() => act(() => api(`${base}/category-groups/${group.id}`, { method: 'DELETE' }))}>Удалить группу</button>}
@@ -74,11 +75,7 @@ function CategoryModal({ groups, category, groupId, onClose }: { groups: Categor
     <Modal eyebrow="Категории" title={category ? 'Изменить категорию' : 'Новая категория'} onClose={onClose}>
       <form onSubmit={submit} style={{ marginTop: 16 }}>
         <label>Название<input value={name} onChange={(e) => setName(e.target.value)} maxLength={50} required autoFocus /></label>
-        <label>Группа
-          <select value={group} onChange={(e) => setGroup(e.target.value)} required>
-            {groups.filter((g) => !category || g.type === groups.find((x) => x.id === category.category_group_id)?.type).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-          </select>
-        </label>
+        <label>Группа<StyledSelect ariaLabel="Группа" value={group} onChange={setGroup} options={groups.filter((g) => !category || g.type === groups.find((x) => x.id === category.category_group_id)?.type).map((g) => ({ value: String(g.id), label: g.name }))} /></label>
         {selected?.type === 'expense' && <label>Лимит в месяц, необязательно<input inputMode="decimal" value={limit} onChange={(e) => setLimit(e.target.value)} placeholder="Без лимита" /></label>}
         <ErrorNote text={error} />
         <button className="primary-button submit">Сохранить</button>
@@ -97,13 +94,14 @@ type Dialog = { kind: 'group'; group?: CategoryGroup } | { kind: 'category'; cat
 
 export function CategoriesPage() {
   const { base, canManage } = useLedger();
-  const { data: groups, isLoading } = useCategoryGroups();
+  const { data: groups, isLoading, isError, refetch } = useCategoryGroups();
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const range = monthRange();
   const { data: spent = [] } = useQuery({ queryKey: [base, 'by-category', range], queryFn: () => api<CategoryTotal[]>(`${base}/analytics/by-category`, { query: range }) });
   const { data: earned = [] } = useQuery({ queryKey: [base, 'by-category', 'income', range], queryFn: () => api<CategoryTotal[]>(`${base}/analytics/by-category`, { query: { ...range, type: 'income' } }) });
 
-  if (isLoading) return <State>Загрузка…</State>;
+  if (isLoading) return <LoadingState />;
+  if (isError) return <ErrorState onRetry={() => refetch()} />;
 
   const totals = new Map([...spent, ...earned].map((row) => [row.category_id, Number(row.total)]));
   const close = () => setDialog(null);

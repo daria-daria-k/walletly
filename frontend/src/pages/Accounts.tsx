@@ -2,11 +2,12 @@ import { ArrowUpRight, Download, MoreHorizontal, Plus, ShieldCheck } from 'lucid
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, errorText } from '../api/client';
-import type { Account } from '../api/types';
+import type { Account, AccountKind } from '../api/types';
 import { useAddOperation } from '../components/Layout';
-import { ErrorNote, Modal, PageHeading, State } from '../components/ui';
+import { StyledSelect } from '../components/StyledSelect';
+import { ErrorNote, ErrorState, LoadingState, Modal, PageHeading, StateCard } from '../components/ui';
 import { useAccounts, useRefreshLedgerData } from '../lib/data';
-import { money, signedMoney } from '../lib/format';
+import { KIND_LABEL, KIND_OPTIONS, money, signedMoney } from '../lib/format';
 import { useLedger } from '../ledger';
 
 const COLORS = ['green', 'blue', 'purple', 'orange'];
@@ -20,6 +21,7 @@ function AccountModal({ account, onClose }: { account?: Account; onClose: () => 
   const refresh = useRefreshLedgerData();
   const [name, setName] = useState(account?.name ?? '');
   const [currency, setCurrency] = useState(account?.currency ?? 'RUB');
+  const [kind, setKind] = useState<AccountKind>(account?.kind ?? 'card');
   const [initial, setInitial] = useState(account?.initial_balance ?? '0');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -40,7 +42,7 @@ function AccountModal({ account, onClose }: { account?: Account; onClose: () => 
   function submit(event: FormEvent) {
     event.preventDefault();
     const initial_balance = parseAmount(initial);
-    act(() => (account ? api(`${base}/accounts/${account.id}`, { method: 'PATCH', body: { name, initial_balance } }) : api(`${base}/accounts`, { method: 'POST', body: { name, currency, initial_balance } })));
+    act(() => (account ? api(`${base}/accounts/${account.id}`, { method: 'PATCH', body: { name, kind, initial_balance } }) : api(`${base}/accounts`, { method: 'POST', body: { name, kind, currency, initial_balance } })));
   }
 
   return (
@@ -48,12 +50,9 @@ function AccountModal({ account, onClose }: { account?: Account; onClose: () => 
       <form onSubmit={submit} style={{ marginTop: 16 }}>
         <label>Название<input value={name} onChange={(e) => setName(e.target.value)} maxLength={50} required autoFocus /></label>
         {!account && (
-          <label>Валюта
-            <select value={currency} onChange={(e) => setCurrency(e.target.value)}>
-              <option value="RUB">Рубль (RUB)</option><option value="USD">Доллар (USD)</option><option value="EUR">Евро (EUR)</option>
-            </select>
-          </label>
+          <label>Валюта<StyledSelect ariaLabel="Валюта" value={currency} onChange={setCurrency} options={[{ value: 'RUB', label: 'Рубль (RUB)' }, { value: 'USD', label: 'Доллар (USD)' }, { value: 'EUR', label: 'Евро (EUR)' }]} /></label>
         )}
+        <label>Тип<StyledSelect ariaLabel="Тип счёта" value={kind} onChange={(value) => setKind(value as AccountKind)} options={KIND_OPTIONS} /></label>
         <label>Начальный остаток<input inputMode="decimal" value={initial} onChange={(e) => setInitial(e.target.value)} required /></label>
         <ErrorNote text={error} />
         <button className="primary-button submit" disabled={saving}>Сохранить</button>
@@ -120,7 +119,7 @@ export function AccountsPage() {
   const openAdd = useAddOperation();
   const navigate = useNavigate();
   const [showArchived, setShowArchived] = useState(false);
-  const { data: accounts, isLoading } = useAccounts(showArchived);
+  const { data: accounts, isLoading, isError, refetch } = useAccounts(showArchived);
   const [modal, setModal] = useState<Account | 'new' | null>(null);
   const [reconciling, setReconciling] = useState(false);
 
@@ -135,7 +134,7 @@ export function AccountsPage() {
         <div><p>На всех счетах</p><h2>{[...totals].map(([code, sum]) => money(sum, code)).join(' · ') || money(0)}</h2></div>
         <span><label><input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} /> Показать архив</label></span>
       </div>
-      {isLoading ? <State>Загрузка…</State> : accounts?.length === 0 ? <State>Счетов пока нет. Добавьте первый.</State> : (
+      {isLoading ? <LoadingState /> : isError ? <ErrorState onRetry={() => refetch()} /> : accounts?.length === 0 ? <StateCard icon="💳" title="Счетов пока нет" text="Добавьте карту, вклад или наличные, чтобы видеть общий баланс." /> : (
         <div className="account-grid">
           {accounts?.map((account, index) => (
             <section className="card account-card" key={account.id}>
@@ -143,7 +142,7 @@ export function AccountsPage() {
                 <span className={`bank-logo ${COLORS[index % COLORS.length]}`}>{account.name[0]}</span>
                 {canManage && <button aria-label={`Настроить счёт ${account.name}`} onClick={() => setModal(account)}><MoreHorizontal /></button>}
               </div>
-              <p>{account.is_active ? account.currency : 'В архиве'}</p>
+              <p>{account.is_active ? KIND_LABEL[account.kind] : 'В архиве'}</p>
               <h3>{account.name}</h3>
               <h2>{money(account.balance, account.currency)}</h2>
               <span>{signedMoney(Number(account.month_change), account.currency)} за месяц</span>

@@ -3,6 +3,7 @@ import { Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { api } from '../api/client';
 import type { CategoryTotal, MonthTotal, Summary } from '../api/types';
+import { StyledSelect } from '../components/StyledSelect';
 import { Metric, PageHeading, State } from '../components/ui';
 import { useAccounts } from '../lib/data';
 import { capitalize, categoryEmoji, changePercent, isoDate, money, monthDative, monthRange, monthTitle, samePeriodRange, signedPercent } from '../lib/format';
@@ -71,13 +72,9 @@ export function AnalyticsPage() {
         action={
           <div className="row-actions">
             {currencies.length > 1 && (
-              <select className="secondary-button" aria-label="Валюта" value={currency} onChange={(e) => setCurrency(e.target.value)}>
-                {currencies.map((code) => <option key={code}>{code}</option>)}
-              </select>
+              <StyledSelect ariaLabel="Валюта" value={currency} onChange={setCurrency} options={currencies.map((code) => ({ value: code, label: code }))} />
             )}
-            <select className="secondary-button" aria-label="Месяц" value={offset} onChange={(e) => setOffset(Number(e.target.value))}>
-              {PERIODS.map((value) => <option key={value} value={value}>{capitalize(monthTitle(value))}</option>)}
-            </select>
+            <StyledSelect ariaLabel="Период аналитики" value={String(offset)} onChange={(value) => setOffset(Number(value))} options={PERIODS.map((value) => ({ value: String(value), label: capitalize(monthTitle(value)) }))} />
           </div>
         }
       />

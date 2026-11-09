@@ -6,7 +6,8 @@ import { api } from '../api/client';
 import type { CategoryTotal, Summary, TransactionPage } from '../api/types';
 import { useAuth } from '../auth';
 import { useAddOperation } from '../components/Layout';
-import { State } from '../components/ui';
+import { StyledSelect } from '../components/StyledSelect';
+import { ErrorState, LoadingState, State } from '../components/ui';
 import { useAccounts, useCategoryGroups } from '../lib/data';
 import { capitalize, categoryEmoji, changePercent, money, monthDative, monthRange, monthTitle, samePeriodRange, shortDate, signedPercent } from '../lib/format';
 import { useLedger } from '../ledger';
@@ -52,7 +53,7 @@ export function OverviewPage() {
   const previous = samePeriodRange();
   const spendingRange = monthRange(spendingOffset);
 
-  const { data: accounts, isLoading } = useAccounts();
+  const { data: accounts, isLoading, isError, refetch } = useAccounts();
   const { data: groups = [] } = useCategoryGroups();
   const summaryQuery = (key: string, query: object) => ({ queryKey: [base, 'summary', key, query], queryFn: () => api<Summary>(`${base}/analytics/summary`, { query: query as Record<string, string> }) });
   const categoriesQuery = (query: object) => ({ queryKey: [base, 'by-category', query], queryFn: () => api<CategoryTotal[]>(`${base}/analytics/by-category`, { query: query as Record<string, string> }) });
@@ -64,7 +65,8 @@ export function OverviewPage() {
   const { data: latest } = useQuery({ queryKey: [base, 'transactions', 'latest'], queryFn: () => api<TransactionPage>(`${base}/transactions`, { query: { limit: 4 } }) });
   const hint = useHint(monthCategories, previousCategories);
 
-  if (isLoading) return <State>Загрузка…</State>;
+  if (isLoading) return <LoadingState />;
+  if (isError) return <ErrorState onRetry={() => refetch()} />;
 
   const rubAccounts = (accounts ?? []).filter((account) => account.currency === 'RUB');
   const balance = rubAccounts.reduce((sum, account) => sum + Number(account.balance), 0);
@@ -123,10 +125,7 @@ export function OverviewPage() {
         <section className="card spending-card">
           <div className="card-title">
             <div><h3>Расходы по категориям</h3><p>{capitalize(monthTitle(spendingOffset))}</p></div>
-            <select aria-label="Период" value={spendingOffset} onChange={(e) => setSpendingOffset(Number(e.target.value))}>
-              <option value={0}>За месяц</option>
-              <option value={-1}>Прошлый месяц</option>
-            </select>
+            <StyledSelect ariaLabel="Период расходов" value={String(spendingOffset)} onChange={(value) => setSpendingOffset(Number(value))} options={[{ value: '0', label: 'За месяц' }, { value: '-1', label: 'Прошлый месяц' }]} />
           </div>
           {spending.length === 0 ? <State>Расходов за этот период нет</State> : (
             <div className="spending-body">

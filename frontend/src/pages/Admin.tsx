@@ -1,70 +1,204 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Search } from 'lucide-react';
+import { Download, Flag, MoreHorizontal, Search, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { api, errorText } from '../api/client';
-import type { AdminStats, AdminUser } from '../api/types';
+import type { AdminStats, AdminUser, AuditEntry } from '../api/types';
 import { useAuth } from '../auth';
-import { ErrorNote, Metric, PageHeading, State } from '../components/ui';
+import { StyledSelect } from '../components/StyledSelect';
+import { ErrorNote, ErrorState, LoadingState, Modal, PageHeading, State, StateCard } from '../components/ui';
+import { dateTime, initials } from '../lib/format';
 
-export function AdminPage() {
+const SECTIONS = ['Дашборд', 'Пользователи', 'Тарифы', 'Платежи', 'Аудит'];
+
+const percent = (part: number, whole: number) => (whole ? `${Math.round((part / whole) * 100)}%` : '—');
+const planLabel = (plan: string) => (plan === 'premium' ? 'Premium' : 'Free');
+
+function Metric({ label, value, delta }: { label: string; value: string; delta: string }) {
+  return <section className="card admin-metric"><p>{label}</p><b>{value}</b><span>{delta}</span></section>;
+}
+
+function Dashboard() {
+  const stats = useQuery({ queryKey: ['admin', 'stats'], queryFn: () => api<AdminStats>('/admin/stats') });
+  const health = useQuery({ queryKey: ['admin', 'health'], queryFn: () => api<{ status: string; database: string }>('/health'), retry: false });
+
+  if (stats.isLoading) return <LoadingState />;
+  if (stats.isError || !stats.data) return <ErrorState onRetry={() => stats.refetch()} />;
+
+  const data = stats.data;
+  const peak = Math.max(...data.registrations.map((week) => week.count), 1);
+  const checkedAt = new Date(health.dataUpdatedAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  const services = [
+    { name: 'API', ok: health.data?.status === 'ok' },
+    { name: 'PostgreSQL', ok: health.data?.database === 'ok' },
+  ];
+
+  return (
+    <>
+      <div className="admin-metrics">
+        <Metric label="Пользователи" value={String(data.users_total)} delta={`+${data.users_new_30d} за 30 дней`} />
+        <Metric label="Активные" value={String(data.users_active)} delta={percent(data.users_active, data.users_total)} />
+        <Metric label="Premium" value={String(data.users_premium)} delta={percent(data.users_premium, data.users_total)} />
+        <Metric label="Операции" value={String(data.transactions_total)} delta="Всего в сервисе" />
+      </div>
+      <div className="admin-grid">
+        <section className="card admin-chart">
+          <div className="section-head"><div><h3>Рост аудитории</h3><p>Регистрации за последние 8 недель</p></div></div>
+          <div className="line-chart-mock">
+            {data.registrations.map((week) => <span key={week.week_start} title={`С ${week.week_start}: ${week.count}`} style={{ height: `${(week.count / peak) * 100}%` }} />)}
+          </div>
+        </section>
+        <section className="card system-health">
+          <div className="section-head"><div><h3>Состояние системы</h3><p>Последняя проверка в {checkedAt}</p></div></div>
+          {services.map((service) => (
+            <div className="health-row" key={service.name}>
+              <span className={service.ok ? '' : 'warning'} />
+              <b>{service.name}</b>
+              <em>{service.ok ? 'Работает' : 'Внимание'}</em>
+            </div>
+          ))}
+        </section>
+      </div>
+    </>
+  );
+}
+
+function downloadCsv(users: AdminUser[]) {
+  // Точка с запятой и BOM: так русский Excel сразу разбирает колонки и кодировку
+  const quote = (value: string) => `"${value.replace(/"/g, '""')}"`;
+  const rows = users.map((u) => [u.email, u.name, u.role, u.plan, u.is_active ? 'Активен' : 'Заблокирован', u.created_at.slice(0, 10)].map(quote).join(';'));
+  const blob = new Blob([`﻿Email;Имя;Роль;Тариф;Статус;Регистрация\n${rows.join('\n')}`], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'walletly-users.csv';
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function UserModal({ target, onClose }: { target: AdminUser; onClose: () => void }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [search, setSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const isAdmin = user?.role === 'admin';
+  const isSelf = target.id === user?.id;
 
-  const { data: stats } = useQuery({ queryKey: ['admin', 'stats'], queryFn: () => api<AdminStats>('/admin/stats'), enabled: isAdmin });
-  const { data: page, isLoading } = useQuery({
-    queryKey: ['admin', 'users', search],
-    queryFn: () => api<{ items: AdminUser[]; total: number }>('/admin/users', { query: { search, limit: 100 } }),
-    enabled: isAdmin,
-  });
-
-  if (!isAdmin) return <Navigate to="/" replace />;
-
-  async function update(target: AdminUser, body: Partial<AdminUser>) {
+  async function update(body: Partial<AdminUser>) {
     setError(null);
     try {
       await api(`/admin/users/${target.id}`, { method: 'PATCH', body });
       await queryClient.invalidateQueries({ queryKey: ['admin'] });
+      onClose();
     } catch (err) {
       setError(errorText(err));
     }
   }
 
+  function toggleBlock() {
+    const question = target.is_active ? `Заблокировать ${target.email}? Все сессии будут завершены.` : `Разблокировать ${target.email}?`;
+    if (window.confirm(question)) update({ is_active: !target.is_active });
+  }
+
   return (
-    <div className="prototype-page">
-      <PageHeading eyebrow="Администрирование" title="Пользователи" />
-      <div className="summary-strip four">
-        <Metric label="Всего" value={String(stats?.users_total ?? '—')} />
-        <Metric label="Активных" value={String(stats?.users_active ?? '—')} />
-        <Metric label="Premium" value={String(stats?.users_premium ?? '—')} />
-        <Metric label="Операций" value={String(stats?.transactions_total ?? '—')} />
+    <Modal eyebrow="Пользователь" title={target.name} onClose={onClose}>
+      <div className="admin-actions">
+        <p>{target.email} · {target.role === 'admin' ? 'Администратор' : 'Пользователь'} · {planLabel(target.plan)}</p>
+        <ErrorNote text={error} />
+        <button className="secondary-button" onClick={() => update({ plan: target.plan === 'free' ? 'premium' : 'free' })}>Сменить тариф на {planLabel(target.plan === 'free' ? 'premium' : 'free')}</button>
+        <button className="secondary-button" disabled={isSelf} onClick={() => update({ role: target.role === 'admin' ? 'user' : 'admin' })}>{target.role === 'admin' ? 'Снять роль администратора' : 'Сделать администратором'}</button>
+        <button className="danger-button" disabled={isSelf} onClick={toggleBlock}>{target.is_active ? 'Заблокировать' : 'Разблокировать'}</button>
       </div>
-      <ErrorNote text={error} />
-      <section className="card data-card">
-        <div className="filterbar"><div className="filter-search"><Search size={17} /><input aria-label="Поиск пользователя" placeholder="Email или имя" value={search} onChange={(e) => setSearch(e.target.value)} /></div></div>
-        {isLoading ? <State>Загрузка…</State> : (
-          <div className="admin-table">
-            <div className="table-head"><span>Email</span><span>Имя</span><span>Роль</span><span>Тариф</span><span>Статус</span><span /></div>
-            {page?.items.map((item) => (
-              <div className="table-row" key={item.id}>
-                <span>{item.email}</span>
-                <span>{item.name}</span>
-                <span>{item.role}</span>
-                <span>{item.plan}</span>
-                <span>{item.is_active ? 'Активен' : 'Заблокирован'}</span>
-                <div className="row-actions">
-                  <button className="small-button" disabled={item.id === user?.id} onClick={() => update(item, { is_active: !item.is_active })}>{item.is_active ? 'Блок.' : 'Разблок.'}</button>
-                  <button className="small-button" disabled={item.id === user?.id} onClick={() => update(item, { role: item.role === 'admin' ? 'user' : 'admin' })}>Роль</button>
-                  <button className="small-button" onClick={() => update(item, { plan: item.plan === 'free' ? 'premium' : 'free' })}>Тариф</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+    </Modal>
+  );
+}
+
+function Users() {
+  const [search, setSearch] = useState('');
+  const [plan, setPlan] = useState('');
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['admin', 'users', search, plan],
+    queryFn: () => api<{ items: AdminUser[]; total: number }>('/admin/users', { query: { search, plan, limit: 200 } }),
+  });
+  const selected = data?.items.find((item) => item.id === selectedId);
+
+  return (
+    <section className="card admin-users">
+      <div className="admin-toolbar">
+        <div className="filter-search"><Search size={17} /><input aria-label="Поиск пользователя" placeholder="Имя или email" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
+        <StyledSelect ariaLabel="Тариф" value={plan} onChange={setPlan} options={[{ value: '', label: 'Все тарифы' }, { value: 'free', label: 'Free' }, { value: 'premium', label: 'Premium' }]} />
+        <button className="secondary-button" disabled={!data?.items.length} onClick={() => data && downloadCsv(data.items)}><Download size={16} />Экспорт</button>
+      </div>
+      {isLoading ? <LoadingState /> : isError ? <ErrorState onRetry={() => refetch()} /> : (
+        <>
+          <div className="admin-user-head"><span>Пользователь</span><span>Тариф</span><span>Статус</span><span>Регистрация</span><span /></div>
+          {data?.items.map((item) => (
+            <div className="admin-user-row" key={item.id}>
+              <div><span>{initials(item.name)}</span><div><b>{item.name}</b><small>{item.email}</small></div></div>
+              <em>{planLabel(item.plan)}</em>
+              <strong className={item.is_active ? '' : 'blocked'}>{item.is_active ? 'Активен' : 'Заблокирован'}</strong>
+              <span>{new Date(item.created_at).toLocaleDateString('ru-RU')}</span>
+              <button aria-label={`Действия: ${item.email}`} onClick={() => setSelectedId(item.id)}><MoreHorizontal size={18} /></button>
+            </div>
+          ))}
+          {data?.items.length === 0 && <State>Никого не найдено</State>}
+        </>
+      )}
+      {selected && <UserModal target={selected} onClose={() => setSelectedId(null)} />}
+    </section>
+  );
+}
+
+function Audit() {
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['admin', 'audit'], queryFn: () => api<AuditEntry[]>('/admin/audit') });
+  if (isLoading) return <LoadingState />;
+  if (isError) return <ErrorState onRetry={() => refetch()} />;
+  return (
+    <section className="card">
+      <div className="section-head" style={{ padding: 18 }}><div><h3>Журнал действий</h3><p>Последние 100 записей. Записи нельзя изменить или удалить</p></div></div>
+      {data?.length === 0 ? <State>Действий пока не было</State> : data?.map((entry) => (
+        <div className="audit-row" key={entry.id}>
+          <small>{dateTime(entry.created_at)}</small>
+          <div><b>{entry.target_email}</b> <small>· {entry.actor_email}</small></div>
+          <em>{entry.detail}</em>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function Placeholder({ title, text }: { title: string; text: string }) {
+  return <section className="card admin-placeholder"><span className="section-icon"><Flag /></span><h3>{title}</h3><p>{text}</p></section>;
+}
+
+export function AdminPage() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [section, setSection] = useState('Дашборд');
+
+  if (user?.role !== 'admin') {
+    return (
+      <StateCard icon="🔒" title="Нет доступа" text="Для просмотра раздела нужны права администратора.">
+        <button className="secondary-button" onClick={() => navigate('/')}>Вернуться назад</button>
+      </StateCard>
+    );
+  }
+
+  return (
+    <div className="prototype-page admin-page">
+      <div className="admin-banner">
+        <ShieldCheck />
+        <div><b>Режим администратора</b><span>Действия записываются в журнал аудита</span></div>
+        <button onClick={() => navigate('/')}>Выйти из режима</button>
+      </div>
+      <PageHeading eyebrow="Управление Walletly" title="Административная панель" subtitle="Пользователи, подписки и состояние сервиса." />
+      <div className="admin-tabs">
+        {SECTIONS.map((item) => <button key={item} className={section === item ? 'active' : ''} onClick={() => setSection(item)}>{item}</button>)}
+      </div>
+      {section === 'Дашборд' && <Dashboard />}
+      {section === 'Пользователи' && <Users />}
+      {section === 'Аудит' && <Audit />}
+      {section === 'Тарифы' && <Placeholder title="Тарифы" text="Настройка стоимости и лимитов появится вместе с оплатой. Тариф пользователю можно сменить в разделе «Пользователи»." />}
+      {section === 'Платежи' && <Placeholder title="Платежи" text="История операций появится после подключения платёжной системы." />}
     </div>
   );
 }

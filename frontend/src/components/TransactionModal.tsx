@@ -4,6 +4,7 @@ import type { Transaction, TxType } from '../api/types';
 import { useAccounts, useCategoryGroups, useRefreshLedgerData } from '../lib/data';
 import { isoDate } from '../lib/format';
 import { useLedger } from '../ledger';
+import { StyledSelect } from './StyledSelect';
 import { ErrorNote, Modal } from './ui';
 
 const TYPES: { value: TxType; label: string }[] = [
@@ -29,6 +30,7 @@ export function TransactionModal({ transaction, preset, onClose }: { transaction
   const [txDate, setTxDate] = useState(transaction?.tx_date ?? isoDate(new Date()));
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   const visibleGroups = groups.filter((group) => group.type === type);
   const effectiveAccount = accountId || String(accounts[0]?.id ?? '');
@@ -41,6 +43,10 @@ export function TransactionModal({ transaction, preset, onClose }: { transaction
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (type === 'transfer' ? !toAccountId : !categoryId) {
+      setError(type === 'transfer' ? 'Выберите счёт зачисления' : 'Выберите категорию');
+      return;
+    }
     setSaving(true); // блокирует кнопку: двойной клик не создаст вторую операцию
     setError(null);
     const body = {
@@ -56,7 +62,8 @@ export function TransactionModal({ transaction, preset, onClose }: { transaction
       if (transaction) await api(`${base}/transactions/${transaction.id}`, { method: 'PATCH', body });
       else await api(`${base}/transactions`, { method: 'POST', body });
       await refresh();
-      onClose();
+      setSaved(true);
+      window.setTimeout(onClose, 900); // успех должен быть заметен, прежде чем окно закроется
     } catch (err) {
       setError(errorText(err));
       setSaving(false);
@@ -94,29 +101,17 @@ export function TransactionModal({ transaction, preset, onClose }: { transaction
         <div className="form-grid">
           <label>
             {type === 'transfer' ? 'Со счёта' : 'Счёт'}
-            <select value={effectiveAccount} onChange={(e) => setAccountId(e.target.value)} required>
-              {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
-            </select>
+            <StyledSelect ariaLabel={type === 'transfer' ? 'Со счёта' : 'Счёт'} value={effectiveAccount} onChange={setAccountId} options={accounts.map((a) => ({ value: String(a.id), label: a.name }))} />
           </label>
           {type === 'transfer' ? (
             <label>
               На счёт
-              <select value={toAccountId} onChange={(e) => setToAccountId(e.target.value)} required>
-                <option value="">Выберите</option>
-                {accounts.filter((a) => String(a.id) !== effectiveAccount).map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
-              </select>
+              <StyledSelect ariaLabel="На счёт" value={toAccountId} onChange={setToAccountId} options={accounts.filter((a) => String(a.id) !== effectiveAccount).map((a) => ({ value: String(a.id), label: a.name }))} />
             </label>
           ) : (
             <label>
               Категория
-              <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} required>
-                <option value="">Выберите</option>
-                {visibleGroups.map((group) => (
-                  <optgroup key={group.id} label={group.name}>
-                    {group.categories.filter((c) => c.is_active || String(c.id) === categoryId).map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
-                  </optgroup>
-                ))}
-              </select>
+              <StyledSelect ariaLabel="Категория" value={categoryId} onChange={setCategoryId} groups={visibleGroups.map((group) => ({ label: group.name, options: group.categories.filter((c) => c.is_active || String(c.id) === categoryId).map((c) => ({ value: String(c.id), label: c.name })) }))} />
             </label>
           )}
         </div>
@@ -130,7 +125,7 @@ export function TransactionModal({ transaction, preset, onClose }: { transaction
         </label>
         <ErrorNote text={accounts.length === 0 ? 'Сначала добавьте счёт на странице «Счета»' : error} />
         <button className="primary-button submit" type="submit" disabled={saving || accounts.length === 0}>
-          {saving ? 'Сохраняем…' : transaction ? 'Сохранить' : SUBMIT_LABEL[type]}
+          {saved ? 'Сохранено ✓' : saving ? 'Сохраняем…' : transaction ? 'Сохранить' : SUBMIT_LABEL[type]}
         </button>
         {transaction && <button type="button" className="danger-button" onClick={remove}>Удалить операцию</button>}
       </form>

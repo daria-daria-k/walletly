@@ -1,5 +1,5 @@
 import { X } from 'lucide-react';
-import { useEffect, type ReactNode } from 'react';
+import { Component, useEffect, type ReactNode } from 'react';
 
 export function PageHeading({ eyebrow, title, subtitle, action }: { eyebrow: string; title: string; subtitle?: string; action?: ReactNode }) {
   return (
@@ -53,6 +53,47 @@ export function ErrorNote({ text }: { text: string | null | undefined }) {
   return text ? <p className="form-error" role="alert">{text}</p> : null;
 }
 
+export function StateCard({ icon, title, text, loading, children }: { icon: string; title: string; text: string; loading?: boolean; children?: ReactNode }) {
+  return (
+    <section className="card state-card">
+      <span className={loading ? 'spin' : ''}>{icon}</span>
+      <h3>{title}</h3>
+      <p>{text}</p>
+      {children}
+    </section>
+  );
+}
+
+export function LoadingState() {
+  return <StateCard icon="⏳" title="Загружаем данные" text="Синхронизируем счета и пересчитываем аналитику." loading />;
+}
+
+export function ErrorState({ onRetry }: { onRetry: () => void }) {
+  return (
+    <StateCard icon="⚠️" title="Не удалось загрузить" text="Проверьте соединение и попробуйте ещё раз.">
+      <button className="secondary-button" onClick={onRetry}>Повторить</button>
+    </StateCard>
+  );
+}
+
 export function State({ children }: { children: ReactNode }) {
   return <div className="state">{children}</div>;
+}
+
+// Ошибка при отрисовке иначе оставила бы пользователя с пустым белым экраном
+export class CrashBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <div className="state-page" data-theme="violet">
+        <ErrorState onRetry={() => window.location.reload()} />
+      </div>
+    );
+  }
 }

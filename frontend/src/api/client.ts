@@ -93,7 +93,7 @@ async function send(path: string, options: Options) {
   });
 }
 
-export async function api<T>(path: string, options: Options = {}): Promise<T> {
+async function request(path: string, options: Options): Promise<Response> {
   let response = await send(path, options);
   if (response.status === 401 && !options.noRefresh) {
     if (await refreshSession()) {
@@ -103,8 +103,24 @@ export async function api<T>(path: string, options: Options = {}): Promise<T> {
     }
   }
   if (!response.ok) throw await errorFrom(response);
+  return response;
+}
+
+export async function api<T>(path: string, options: Options = {}): Promise<T> {
+  const response = await request(path, options);
   if (response.status === 204) return undefined as T;
   return response.json();
+}
+
+// Обычная ссылка на файл не подойдёт: access-токен передаётся только в заголовке
+export async function downloadFile(path: string, filename: string, query?: Query): Promise<void> {
+  const response = await request(path, { query });
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 export function errorText(error: unknown): string {

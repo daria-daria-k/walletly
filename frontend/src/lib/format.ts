@@ -80,3 +80,20 @@ export function categoryEmoji(name: string | undefined, type: 'income' | 'expens
   if (type === 'transfer') return '🔄';
   return EMOJI.find(([pattern]) => pattern.test(name ?? ''))?.[1] ?? (type === 'income' ? '💵' : '🧾');
 }
+
+export const KIND_LABEL = { card: 'Банковская карта', savings: 'Накопительный счёт', deposit: 'Вклад', cash: 'Наличные' };
+
+export const KIND_OPTIONS = Object.entries(KIND_LABEL).map(([value, label]) => ({ value, label }));
+
+export function plural(count: number, one: string, few: string, many: string): string {
+  const tens = count % 100;
+  const units = count % 10;
+  if (tens >= 11 && tens <= 14) return `${count} ${many}`;
+  if (units === 1) return `${count} ${one}`;
+  if (units >= 2 && units <= 4) return `${count} ${few}`;
+  return `${count} ${many}`;
+}
+
+export function dateTime(value: string): string {
+  return new Date(value).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+}

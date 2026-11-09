@@ -86,3 +86,79 @@
   .member-row em,.member-row select,.member-row button{grid-column:2;justify-self:start}
   .member-row>i{display:none}
 }
+
+/* Новые экраны */
+.walletly-select-positioner{z-index:120;outline:0}
+.walletly-select-content{min-width:var(--anchor-width);max-height:min(320px,var(--available-height));overflow-y:auto;outline:0}
+.walletly-select-trigger{display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;text-align:left}
+.walletly-select-trigger span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.walletly-select-trigger svg{flex:0 0 auto}
+.walletly-select-placeholder{color:var(--muted)}
+.walletly-select-item{position:relative;display:flex;align-items:center;cursor:pointer;outline:0}
+.walletly-select-indicator{position:absolute;right:11px;display:flex}
+.walletly-select-group-label{padding:9px 11px 4px;color:var(--muted);font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+.filterbar>.walletly-select-trigger,.row-actions .walletly-select-trigger{width:auto}
+.family-chip .walletly-select-trigger{flex:1;min-width:0;height:auto!important;padding:0!important;border:0!important;color:inherit!important;background:transparent!important;box-shadow:none;font-size:inherit!important;font-weight:inherit!important}
+.family-chip .walletly-select-trigger svg{color:inherit}
+.member-row .walletly-select-trigger{width:auto;min-width:118px;height:32px!important;font-size:11px!important}
+.auth-page{align-content:center}
+.auth-page .auth-layout{width:min(1060px,100%)}
+.auth-story .brand{padding:0 0 34px}
+.auth-card form{margin:0}
+.auth-page>.modal.auth-card{margin:0;padding:24px}
+.state-page{min-height:100vh;padding:20px;background:var(--canvas);display:grid;place-items:center}
+.state-page .state-card{width:min(420px,100%)}
+.state-card a{text-decoration:none}
+.import-panel .columns-hint{margin:14px 0 0;color:var(--muted);font-size:11px;line-height:1.55}
+.upload-zone{cursor:pointer}
+.upload-zone.dragging{border-color:var(--mint-dark)}
+.format-cards button:disabled{opacity:.55;cursor:not-allowed}
+.history-row{grid-template-columns:36px 1fr 110px 80px}
+.file-icon{width:36px;height:36px;border-radius:11px;color:var(--mint-dark);background:var(--canvas);display:grid;place-items:center}
+.import-panel .errors-list{margin:12px 0 0;padding:0;list-style:none;font-size:12px}
+.ai-note{margin:14px 2px 0;color:var(--muted);font-size:12px}
+.plan-step button,.ai-insight button{cursor:pointer}
+.toggle-row>div b{display:block;font-size:14px}
+.toggle-row>div span{display:block;margin-top:5px;color:var(--muted);font-size:11px}
+.toggle-row>button{width:43px;height:24px;padding:3px;border:0;border-radius:99px;background:#d8dde4;display:flex;align-items:center;cursor:pointer;flex:0 0 auto}
+.toggle-row>button i{width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 2px 5px #0002}
+.toggle-row>button.enabled{background:var(--mint-dark);justify-content:flex-end}
+.security-list>div{padding:18px 0;border-bottom:1px solid var(--line);display:grid;grid-template-columns:38px 1fr auto;align-items:center;gap:12px}
+.security-list>div>span{width:38px;height:38px;border-radius:11px;background:var(--canvas);display:grid;place-items:center}
+.security-form{padding:16px 0;border-bottom:1px solid var(--line)}
+.subscription-current small{display:block;margin-bottom:5px;color:#c8c3e8;font-size:11px}
+.subscription-current p{margin:6px 0 0}
+.plan-benefits ul{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(2,1fr);gap:10px;grid-column:span 2}
+.plan-benefits li{display:flex;align-items:center;gap:8px;font-size:12px}
+.plan-benefits li svg{width:16px;height:16px}
+.billing-row span{display:block;margin-top:5px;color:var(--muted);font-size:11px}
+.admin-toolbar{padding:14px;display:flex;flex-wrap:wrap;gap:8px}
+.admin-toolbar .filter-search{flex:1;min-width:180px}
+.admin-toolbar .walletly-select-trigger{width:auto}
+.admin-user-row button{cursor:pointer}
+.admin-actions{margin-top:16px;display:grid;gap:8px}
+.admin-actions p{margin:0 0 6px;color:var(--muted);font-size:13px}
+.line-chart-mock span{min-height:3px}
+.audit-row{padding:12px 18px;border-top:1px solid var(--line);display:grid;grid-template-columns:150px 1fr auto;gap:10px;align-items:center;font-size:12px}
+.audit-row small{color:var(--muted)}
+.audit-row em{font-style:normal;color:var(--mint-dark)}
+.onboarding-card .choice-row+.choice-row{margin-top:12px}
+.onboarding-card .form-error{margin-top:14px}
+@media(max-width:640px){
+  .plan-benefits ul{grid-template-columns:1fr;grid-column:auto}
+  .security-list>div{grid-template-columns:38px 1fr}
+  .security-list>div>button{grid-column:2;justify-self:start}
+  .audit-row{grid-template-columns:1fr;padding:12px 14px}
+  .history-row{grid-template-columns:36px 1fr 70px}
+  /* minmax(0,1fr): иначе дорожка растягивается по ширине самой длинной подписи и карточка вылезает за отступ */
+  .settings-grid{grid-template-columns:minmax(0,1fr)}
+  .settings-nav{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .settings-nav button{padding:12px 6px;font-size:13px;text-align:center}
+  /* Таблица широкая и прокручивается, а поиск и экспорт должны оставаться на экране */
+  .admin-toolbar{position:sticky;left:0;min-width:0;flex-wrap:wrap}
+  .admin-toolbar .filter-search{min-width:100%}
+  .admin-toolbar .walletly-select-trigger,.admin-toolbar .secondary-button{flex:1}
+}
+
+.choice-row.three{grid-template-columns:repeat(3,1fr)}
+@media(max-width:640px){.choice-row.three{grid-template-columns:1fr}}
