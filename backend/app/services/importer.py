@@ -11,7 +11,7 @@ from app.models import Account, Category, CategoryGroup, ImportBatch, LedgerMemb
 from app.models.enums import CategoryType, Plan, TransactionType
 from app.schemas.imports import ImportResult, ImportRowError
 from app.services import file_sandbox, statement
-from app.services.billing import get_plan
+from app.services.billing import get_plan, require_premium
 from app.services.errors import DomainError, InvalidDataError
 from app.services.ml import predict_for_import
 from app.services.scoped import get_in_ledger
@@ -46,10 +46,12 @@ class ParsedRow:
     values: dict[str, object]
 
 
-async def _parse_table(content: bytes, filename: str) -> list[ParsedRow]:
+async def _read_table(content: bytes, filename: str) -> list[list]:
     kind = "csv" if filename.lower().endswith(".csv") else "xlsx"
-    table = (await file_sandbox.run(kind, content))["rows"]
+    return (await file_sandbox.run(kind, content))["rows"]
 
+
+def _template_rows(table: list[list]) -> list[ParsedRow]:
     if not table:
         raise InvalidDataError("Файл пустой")
     header = [_COLUMNS.get(str(cell or "").strip().lower()) for cell in table[0][1]]
@@ -205,10 +207,22 @@ def _fingerprint(tx: Transaction) -> tuple:
 
 
 async def import_transactions(
-    session: AsyncSession, member: LedgerMember, content: bytes, filename: str, *, dry_run: bool
+    session: AsyncSession,
+    member: LedgerMember,
+    content: bytes,
+    filename: str,
+    *,
+    dry_run: bool,
+    account_id: int | None = None,
 ) -> ImportResult:
-    rows = await _parse_table(content, filename)
-    return await _import_rows(session, member, rows, filename, dry_run=dry_run)
+    table = await _read_table(content, filename)
+    parsed = statement.parse_table(table)
+    if parsed is None:
+        return await _import_rows(session, member, _template_rows(table), filename, dry_run=dry_run)
+    await require_premium(session, member.user_id, "Разбор выписок")
+    if account_id is None:
+        raise InvalidDataError("Выберите счёт, к которому относится выписка")
+    return await _import_parsed(session, member, parsed, filename, account_id, dry_run=dry_run)
 
 
 async def _fallback_categories(session: AsyncSession, ledger_id: int) -> dict[CategoryType, int]:
@@ -245,10 +259,35 @@ async def import_statement(
     *,
     dry_run: bool,
 ) -> ImportResult:
-    account = await get_in_ledger(session, Account, member.ledger_id, account_id)
     text = (await file_sandbox.run("pdf", content))["text"]
-    lines = statement.parse_text(text)
-    if not lines:
+    parsed = statement.parse_pdf_text(text)
+    return await _import_parsed(session, member, parsed, filename, account_id, dry_run=dry_run)
+
+
+def _money(value: Decimal) -> str:
+    return f"{value:,.2f}".replace(",", " ").replace(".", ",")
+
+
+def _statement_warning(parsed: statement.ParsedStatement) -> str | None:
+    totals = f"доходы {_money(parsed.income)} ₽, расходы {_money(parsed.expense)} ₽"
+    if parsed.reconciled is False:
+        return f"Итоги выписки не совпали с найденными операциями: {totals}. Сверьте суммы перед загрузкой"
+    if parsed.reconciled is None and parsed.bank is None:
+        return f"Банк не определён, итогов для сверки нет: {totals}. Сверьте суммы перед загрузкой"
+    return None
+
+
+async def _import_parsed(
+    session: AsyncSession,
+    member: LedgerMember,
+    parsed: statement.ParsedStatement,
+    filename: str,
+    account_id: int,
+    *,
+    dry_run: bool,
+) -> ImportResult:
+    account = await get_in_ledger(session, Account, member.ledger_id, account_id)
+    if not parsed.lines:
         raise InvalidDataError("В файле не найдено операций. Возможно, это скан или другой формат")
     rows = [
         ParsedRow(
@@ -260,10 +299,11 @@ async def import_statement(
                 "description": line.description,
             },
         )
-        for number, line in enumerate(lines, start=1)
+        for number, line in enumerate(parsed.lines, start=1)
     ]
     fallback = await _fallback_categories(session, member.ledger_id)
-    return await _import_rows(session, member, rows, filename, dry_run=dry_run, fallback=fallback)
+    result = await _import_rows(session, member, rows, filename, dry_run=dry_run, fallback=fallback)
+    return result.model_copy(update={"bank": parsed.bank, "warning": _statement_warning(parsed)})
 
 
 async def _import_rows(

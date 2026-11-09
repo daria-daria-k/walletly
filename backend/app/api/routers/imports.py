@@ -15,7 +15,11 @@ router = APIRouter(prefix="/ledgers/{ledger_id}/import", tags=["import"])
 
 @router.post("")
 async def upload(
-    file: UploadFile, member: Membership, session: SessionDep, dry_run: bool = False
+    file: UploadFile,
+    member: Membership,
+    session: SessionDep,
+    dry_run: bool = False,
+    account_id: int | None = None,
 ) -> ImportResult:
     filename = file.filename or ""
     if not filename.lower().endswith((".xlsx", ".csv")):
@@ -24,7 +28,9 @@ async def upload(
     content = await file.read(MAX_FILE_SIZE + 1)
     if len(content) > MAX_FILE_SIZE:
         raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Файл больше 5 МБ")
-    return await import_transactions(session, member, content, filename, dry_run=dry_run)
+    return await import_transactions(
+        session, member, content, filename, dry_run=dry_run, account_id=account_id
+    )
 
 
 @router.post("/statement")

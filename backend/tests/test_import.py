@@ -51,6 +51,8 @@ async def test_csv_import_creates_operations(client: AsyncClient, anna: AuthedUs
         "skipped_duplicates": 0,
         "errors": [],
         "dry_run": False,
+        "bank": None,
+        "warning": None,
     }
     accounts = await client.get(f"/api/ledgers/{anna.ledger_id}/accounts", headers=anna.headers)
     assert {a["name"]: a["balance"] for a in accounts.json()} == {

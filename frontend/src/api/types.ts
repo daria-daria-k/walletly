@@ -16,7 +16,7 @@ export interface Summary { income: string; expense: string; net: string }
 export interface CategoryTotal { category_id: number; category_name: string; group_name: string; total: string }
 export interface AuthorTotal { user_id: number; name: string; total: string }
 export interface MonthTotal { month: string; income: string; expense: string }
-export interface ImportResult { total_rows: number; created: number; skipped_duplicates: number; errors: { row: number; message: string }[]; dry_run: boolean }
+export interface ImportResult { total_rows: number; created: number; skipped_duplicates: number; errors: { row: number; message: string }[]; dry_run: boolean; bank: string | null; warning: string | null }
 export interface Invitation { id: number; email: string; token: string; status: 'pending' | 'accepted' | 'declined' | 'expired'; expires_at: string; created_at: string }
 export interface InvitationPreview { ledger_name: string; invited_email: string; status: Invitation['status']; expires_at: string }
 export interface AdminStats { users_total: number; users_active: number; users_premium: number; users_new_30d: number; transactions_total: number; registrations: { week_start: string; count: number }[] }

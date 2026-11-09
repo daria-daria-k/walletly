@@ -171,3 +171,27 @@ async def test_statement_needs_premium(client: AsyncClient, register) -> None:
         headers=user.headers,
     )
     assert response.status_code == 403
+
+
+def test_two_line_statement_uses_real_description() -> None:
+    # Вымышленный пример в формате Сбера: настоящих выписок в репозитории быть не должно
+    text = "\n".join(
+        [
+            "Дата обработки Описание операции Сумма в валюте",
+            "01.11.2026 10:15 Супермаркеты 1 250,50 8 749,50",
+            "02.11.2026 123456 PYATEROCHKA 1234. Операция по карте ****1234",
+            "03.11.2026 09:00 Прочие операции +5 000,00 13 749,50",
+            "03.11.2026 654321 Перевод от Иван И.. Операция по счёту",
+            "****1234",
+            "04.11.2026 12:00 Рестораны и кафе 300,00 13 449,50",
+        ]
+    )
+
+    lines = statement.parse_text(text)
+
+    assert [(line.description, line.amount) for line in lines] == [
+        ("PYATEROCHKA 1234", Decimal("-1250.50")),
+        ("Перевод от Иван И.", Decimal("5000.00")),
+        # Второй строки нет: остаётся то, что банк указал в первой
+        ("Рестораны и кафе", Decimal("-300.00")),
+    ]

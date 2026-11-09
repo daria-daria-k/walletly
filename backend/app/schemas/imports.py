@@ -14,6 +14,8 @@ class ImportResult(BaseModel):
     skipped_duplicates: int
     errors: list[ImportRowError]
     dry_run: bool
+    bank: str | None = None
+    warning: str | None = None
 
 
 class ImportBatchRead(BaseModel):

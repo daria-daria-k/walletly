@@ -58,7 +58,9 @@ export function ImportPage() {
     form.append('file', target);
     try {
       const isPdf = target.name.toLowerCase().endsWith('.pdf');
-      const response = await api<ImportResult>(`${base}/import${isPdf ? '/statement' : ''}`, { method: 'POST', form, query: isPdf ? { dry_run: dryRun, account_id: Number(statementAccount || accounts?.[0]?.id) } : { dry_run: dryRun } });
+      // Счёт отправляем и с таблицей: выгрузка банка узнаётся по колонкам уже на сервере
+      const accountId = statementAccount || accounts?.[0]?.id;
+      const response = await api<ImportResult>(`${base}/import${isPdf ? '/statement' : ''}`, { method: 'POST', form, query: { dry_run: dryRun, ...(accountId ? { account_id: Number(accountId) } : {}) } });
       setResult(response);
       if (!dryRun) await refresh();
       await refetchHistory();
@@ -110,8 +112,8 @@ export function ImportPage() {
         <section className="card import-panel">
           <div className="section-icon"><Upload /></div>
           <h3>Импорт операций</h3>
-          <p>Загрузите Excel или CSV. Сначала Walletly проверит файл, и только потом добавит операции.</p>
-          {Boolean(accounts?.length) && <label className="statement-account">Счёт для PDF-выписки<StyledSelect ariaLabel="Счёт для PDF-выписки" value={statementAccount || String(accounts?.[0]?.id)} onChange={setStatementAccount} options={(accounts ?? []).map((item) => ({ value: String(item.id), label: item.name }))} /></label>}
+          <p>Загрузите выписку банка в PDF или CSV либо свой файл Excel или CSV. Сначала Walletly проверит файл, и только потом добавит операции.</p>
+          {Boolean(accounts?.length) && <label className="statement-account">Счёт для выписки банка<StyledSelect ariaLabel="Счёт для выписки банка" value={statementAccount || String(accounts?.[0]?.id)} onChange={setStatementAccount} options={(accounts ?? []).map((item) => ({ value: String(item.id), label: item.name }))} /></label>}
           <input ref={inputRef} hidden aria-label="Файл для импорта" type="file" accept=".xlsx,.csv,.pdf" onChange={(e) => { choose(e.target.files?.[0]); e.target.value = ''; }} />
           <button
             className={`upload-zone ${dragging ? 'dragging' : ''}`}
@@ -123,7 +125,7 @@ export function ImportPage() {
           >
             <FileSpreadsheet />
             <b>{busy ? 'Обрабатываем файл…' : file ? file.name : 'Перетащите файл или нажмите для выбора'}</b>
-            <span>{file ? `${Math.ceil(file.size / 1024)} КБ` : 'XLSX или CSV до 5 МБ'}</span>
+            <span>{file ? `${Math.ceil(file.size / 1024)} КБ` : 'PDF, XLSX или CSV до 5 МБ'}</span>
           </button>
           <p className="columns-hint">
             Колонки: <b>Дата, Сумма, Счёт</b> — обязательные; Тип, Счёт зачисления, Категория, Описание. Счета и категории должны уже быть в Walletly. <a className="text-link" href="/import-template.csv" download>Скачать шаблон</a>
@@ -133,7 +135,7 @@ export function ImportPage() {
             <div className="import-success">
               <BadgeCheck />
               <div>
-                {ready && <b>Файл успешно распознан</b>}
+                {ready && <b>{result.bank ? `Распознана выписка: ${result.bank}` : 'Файл успешно распознан'}</b>}
                 {!result.dry_run && <b>Импорт завершён</b>}
                 {result.dry_run && !ready && <b>Новых операций нет</b>}
                 <span>
@@ -144,6 +146,7 @@ export function ImportPage() {
               {ready && file && <button className="primary-button" disabled={busy} onClick={() => send(file, false)}>Продолжить</button>}
             </div>
           )}
+          {result?.warning && <ErrorNote text={result.warning} />}
           {result && result.errors.length > 0 && (
             <>
               <ErrorNote text={`Ошибок: ${result.errors.length}. Файл не загружен: исправьте строки и выберите его снова.`} />

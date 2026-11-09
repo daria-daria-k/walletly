@@ -78,8 +78,14 @@ def _xlsx_rows(content: bytes):
 
 def _csv_rows(content: bytes):
     # utf-8-sig: Excel сохраняет CSV с BOM, иначе он приклеится к первому заголовку
-    text = content.decode("utf-8-sig")
-    delimiter = ";" if ";" in text.split("\n", 1)[0] else ","
+    try:
+        text = content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        # Т-Банк, Альфа и ВТБ выгружают CSV в кодировке Windows
+        text = content.decode("cp1251")
+    # Первая строка выгрузки ВТБ бывает без разделителей, поэтому берём первую, где они есть
+    sample = next((line for line in text.splitlines()[:10] if ";" in line or "," in line), "")
+    delimiter = ";" if ";" in sample else ","
     return enumerate(csv.reader(io.StringIO(text), delimiter=delimiter), start=1)
 
 
