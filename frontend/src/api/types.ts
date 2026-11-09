@@ -26,6 +26,9 @@ export interface Goal { id: number; ledger_id: number; name: string; target_amou
 export interface ContributionItem { id: number; user_name: string; amount: string; contributed_on: string; from_transfer: boolean; created_at: string }
 export interface NotificationItem { id: number; kind: string; title: string; body: string; link: string; read_at: string | null; created_at: string }
 export interface NotificationList { items: NotificationItem[]; unread: number }
+export interface PlanInfo { price: string; period_days: number; payments_enabled: boolean }
+export interface PaymentItem { id: number; amount: string; status: 'pending' | 'succeeded' | 'canceled'; paid_at: string | null; created_at: string }
+export interface AdminPayment extends PaymentItem { email: string }
 export interface ImportBatch { id: number; filename: string; total_rows: number; created: number; skipped_duplicates: number; errors: number; created_at: string }
 export interface AuditEntry { id: number; actor_email: string; target_email: string; action: string; detail: string; created_at: string }
 export interface Insights {

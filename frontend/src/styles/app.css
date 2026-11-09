@@ -206,3 +206,13 @@
 .notif-item span,.notif-item small{color:var(--muted);font-size:12px}
 .notif-item small{font-size:11px}
 @media(max-width:640px){.notif-button{display:grid;place-items:center}.notif-panel{position:fixed;top:66px;right:16px}}
+
+.payment-history{margin-top:16px;display:grid;gap:8px;font-size:12px}
+.payment-history>div{display:flex;justify-content:space-between;gap:10px;color:var(--muted)}
+.payment-history em{font-style:normal}
+
+.admin-plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.admin-plans section{padding:20px}
+.admin-plans h3,.admin-plans h2{margin:0 0 8px}
+.admin-plans small{color:var(--muted);font-size:13px;font-weight:400}
+.admin-plans p{margin:0;color:var(--muted);font-size:13px}

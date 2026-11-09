@@ -24,7 +24,7 @@ async def list_goals(member: Membership, session: SessionDep) -> list[GoalRead]:
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_goal(data: GoalCreate, member: ManagerMembership, session: SessionDep) -> GoalRead:
-    return await goal_service.create_goal(session, member.ledger_id, data)
+    return await goal_service.create_goal(session, member.ledger_id, member.user_id, data)
 
 
 @router.patch("/{goal_id}")

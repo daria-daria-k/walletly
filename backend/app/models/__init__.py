@@ -6,7 +6,7 @@ from app.models.category import Category, CategoryGroup
 from app.models.finance import Account, ImportBatch, Transaction
 from app.models.goal import GoalContribution, SavingsGoal
 from app.models.ledger import Invitation, Ledger, LedgerMember
-from app.models.user import Subscription, User
+from app.models.user import Payment, Subscription, User
 
 __all__ = [
     "Account",
@@ -21,6 +21,7 @@ __all__ = [
     "Ledger",
     "LedgerMember",
     "Notification",
+    "Payment",
     "RefreshToken",
     "SavingsGoal",
     "Subscription",

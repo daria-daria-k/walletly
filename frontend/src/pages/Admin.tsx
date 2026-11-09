@@ -1,13 +1,13 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download, Flag, MoreHorizontal, Search, ShieldCheck } from 'lucide-react';
+import { Download, MoreHorizontal, Search, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, errorText } from '../api/client';
-import type { AdminStats, AdminUser, AuditEntry } from '../api/types';
+import type { AdminPayment, AdminStats, AdminUser, AuditEntry, PlanInfo } from '../api/types';
 import { useAuth } from '../auth';
 import { StyledSelect } from '../components/StyledSelect';
 import { ErrorNote, ErrorState, LoadingState, Modal, PageHeading, State, StateCard } from '../components/ui';
-import { dateTime, initials } from '../lib/format';
+import { dateTime, initials, money } from '../lib/format';
 
 const SECTIONS = ['Дашборд', 'Пользователи', 'Тарифы', 'Платежи', 'Аудит'];
 
@@ -166,8 +166,28 @@ function Audit() {
   );
 }
 
-function Placeholder({ title, text }: { title: string; text: string }) {
-  return <section className="card admin-placeholder"><span className="section-icon"><Flag /></span><h3>{title}</h3><p>{text}</p></section>;
+function Plans() {
+  const { data } = useQuery({ queryKey: ['billing-plan'], queryFn: () => api<PlanInfo>('/billing/plan') });
+  return (
+    <div className="admin-plans">
+      <section className="card"><h3>Free</h3><h2>0 ₽</h2><p>Счета, операции, семья, одна копилка, подсказки на правилах, импорт и экспорт Excel.</p></section>
+      <section className="card"><h3>Premium</h3><h2>{data ? money(data.price) : '…'}<small> / {data?.period_days ?? 30} дней</small></h2><p>Копилки без ограничений, умные категории и прогнозы, Telegram-бот, разбор выписок. Цена задаётся в PREMIUM_PRICE_RUB.</p></section>
+    </div>
+  );
+}
+
+const PAYMENT_LABEL: Record<AdminPayment['status'], string> = { pending: 'Ожидает', succeeded: 'Оплачен', canceled: 'Отменён' };
+
+function Payments() {
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['admin', 'payments'], queryFn: () => api<AdminPayment[]>('/admin/payments') });
+  if (isLoading) return <LoadingState />;
+  if (isError) return <ErrorState onRetry={() => refetch()} />;
+  if (!data?.length) return <StateCard icon="💳" title="Платежей пока нет" text="Здесь появятся оплаты подписки." />;
+  return (
+    <section className="card">
+      {data.map((item) => <div className="audit-row" key={item.id}><small>{dateTime(item.created_at)}</small><span>{item.email} · {money(item.amount)}</span><em>{PAYMENT_LABEL[item.status]}</em></div>)}
+    </section>
+  );
 }
 
 export function AdminPage() {
@@ -197,8 +217,8 @@ export function AdminPage() {
       {section === 'Дашборд' && <Dashboard />}
       {section === 'Пользователи' && <Users />}
       {section === 'Аудит' && <Audit />}
-      {section === 'Тарифы' && <Placeholder title="Тарифы" text="Настройка стоимости и лимитов появится вместе с оплатой. Тариф пользователю можно сменить в разделе «Пользователи»." />}
-      {section === 'Платежи' && <Placeholder title="Платежи" text="История операций появится после подключения платёжной системы." />}
+      {section === 'Тарифы' && <Plans />}
+      {section === 'Платежи' && <Payments />}
     </div>
   );
 }

@@ -106,9 +106,13 @@ async def register_user(session: AsyncSession, data: RegisterRequest) -> User:
 
 
 async def current_subscription(session: AsyncSession, user_id: int) -> Subscription:
+    # Истёкшую запись пропускаем: под ней всегда лежит бессрочный Free из регистрации
     return await session.scalar(
         select(Subscription)
-        .where(Subscription.user_id == user_id)
+        .where(
+            Subscription.user_id == user_id,
+            or_(Subscription.expires_at.is_(None), Subscription.expires_at > datetime.now(UTC)),
+        )
         .order_by(Subscription.id.desc())
         .limit(1)
     )

@@ -45,6 +45,12 @@ class AccountKind(StrEnum):
     CASH = "cash"
 
 
+class PaymentStatus(StrEnum):
+    PENDING = "pending"
+    SUCCEEDED = "succeeded"
+    CANCELED = "canceled"
+
+
 class EmailTokenPurpose(StrEnum):
     PASSWORD_RESET = "password_reset"
     EMAIL_VERIFICATION = "email_verification"

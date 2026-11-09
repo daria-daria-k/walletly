@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     smtp_from: str = "Walletly <noreply@walletly.local>"
     smtp_tls: bool = True
 
+    # Ключи ЮKassa: тестового магазина при разработке, боевого после договора
+    yookassa_shop_id: str = ""
+    yookassa_secret_key: str = ""
+    premium_price_rub: int = 299
+
     @property
     def database_url(self) -> URL:
         # URL.create сам экранирует спецсимволы в пароле, в отличие от f-строки

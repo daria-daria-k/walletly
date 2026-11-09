@@ -1,12 +1,13 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Palette, ShieldCheck } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api, errorText, setAccessToken } from '../api/client';
-import type { NotificationSettings } from '../api/types';
+import type { NotificationSettings, PaymentItem, PlanInfo } from '../api/types';
 import { useAuth } from '../auth';
 import { THEME_KEY } from '../components/Layout';
 import { ErrorNote, PageHeading } from '../components/ui';
-import { initials, plural, shortDate } from '../lib/format';
+import { dateTime, initials, money, plural, shortDate } from '../lib/format';
 
 const THEMES = [
   { id: 'violet', name: 'AI Violet', note: 'Технологичная и выразительная', colors: ['#241B4B', '#7C65E8', '#FF6B7A'] },
@@ -26,7 +27,10 @@ const NOTIFICATIONS: { key: keyof NotificationSettings; title: string; text: str
   { key: 'family', title: 'Семейная группа', text: 'Новые операции и приглашения участников' },
 ];
 
-const BENEFITS = ['Неограниченные счета и операции', 'Семейная группа', 'Подсказки и прогнозы', 'Импорт и экспорт отчётов'];
+const BENEFITS = {
+  free: ['Счета и операции без ограничений', 'Семейная группа', 'Одна копилка', 'Подсказки, импорт и экспорт Excel'],
+  premium: ['Всё из тарифа Free', 'Копилки без ограничений', 'Умные категории и прогнозы', 'Telegram-бот и разбор выписок'],
+};
 
 function currentTheme() {
   try {
@@ -34,6 +38,53 @@ function currentTheme() {
   } catch {
     return 'violet';
   }
+}
+
+const PAYMENT_STATUS: Record<PaymentItem['status'], string> = { pending: 'Ожидает оплаты', succeeded: 'Оплачен', canceled: 'Отменён' };
+
+function Billing() {
+  const { reload } = useAuth();
+  const queryClient = useQueryClient();
+  const [params, setParams] = useSearchParams();
+  const [error, setError] = useState<string | null>(null);
+  const { data: plan } = useQuery({ queryKey: ['billing-plan'], queryFn: () => api<PlanInfo>('/billing/plan') });
+  const { data: payments } = useQuery({ queryKey: ['billing-payments'], queryFn: () => api<PaymentItem[]>('/billing/payments') });
+  const returned = params.get('payment');
+
+  useEffect(() => {
+    if (!returned) return;
+    // Вернулись со страницы оплаты: спрашиваем статус сами, уведомление могло ещё не дойти
+    api(`/billing/payments/${returned}/sync`, { method: 'POST' })
+      .then(() => Promise.all([reload(), queryClient.invalidateQueries({ queryKey: ['billing-payments'] })]))
+      .catch((err) => setError(errorText(err)))
+      .finally(() => setParams({}, { replace: true }));
+  }, [returned, reload, queryClient, setParams]);
+
+  async function pay() {
+    setError(null);
+    try {
+      const { confirmation_url } = await api<{ confirmation_url: string }>('/billing/checkout', { method: 'POST' });
+      window.location.href = confirmation_url;
+    } catch (err) {
+      setError(errorText(err));
+    }
+  }
+
+  return (
+    <>
+      <div className="billing-row">
+        <div><b>Premium: {plan ? money(plan.price) : '…'} за {plan?.period_days ?? 30} дней</b><span>{plan?.payments_enabled ? 'Безопасная оплата через ЮKassa. Без автосписаний.' : 'Оплата пока не настроена, тариф может выдать администратор.'}</span></div>
+        <button className="primary-button" disabled={!plan?.payments_enabled} onClick={pay}>Оплатить</button>
+      </div>
+      <ErrorNote text={error} />
+      {Boolean(payments?.length) && (
+        <div className="payment-history">
+          <b>История платежей</b>
+          {payments?.map((item) => <div key={item.id}><span>{dateTime(item.created_at)}</span><span>{money(item.amount)}</span><em>{PAYMENT_STATUS[item.status]}</em></div>)}
+        </div>
+      )}
+    </>
+  );
 }
 
 export function SettingsPage() {
@@ -217,9 +268,9 @@ export function SettingsPage() {
             </div>
             <div className="plan-benefits">
               <b>В тариф включено</b>
-              <ul>{BENEFITS.map((item) => <li key={item}><Check />{item}</li>)}</ul>
+              <ul>{BENEFITS[user?.plan === 'premium' ? 'premium' : 'free'].map((item) => <li key={item}><Check />{item}</li>)}</ul>
             </div>
-            <div className="billing-row"><div><b>Оплата пока не подключена</b><span>Сейчас тариф меняет администратор</span></div></div>
+            <Billing />
           </section>
         )}
       </div>

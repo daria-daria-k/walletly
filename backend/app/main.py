@@ -9,6 +9,7 @@ from app.api.routers import (
     admin,
     analytics,
     auth,
+    billing,
     categories,
     exports,
     goals,
@@ -69,6 +70,7 @@ for module in (
     invitations,
     admin,
     notifications,
+    billing,
 ):
     api.include_router(module.router)
 app.include_router(api)

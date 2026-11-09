@@ -12,7 +12,10 @@ from app.services.errors import ConflictError, NotFoundError
 # Действующий тариф — последняя запись подписки: старые остаются как история
 _current_plan = (
     select(Subscription.plan)
-    .where(Subscription.user_id == User.id)
+    .where(
+        Subscription.user_id == User.id,
+        or_(Subscription.expires_at.is_(None), Subscription.expires_at > func.now()),
+    )
     .order_by(Subscription.id.desc())
     .limit(1)
     .correlate(User)

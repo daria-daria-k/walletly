@@ -2,13 +2,13 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import ROUND_CEILING, Decimal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
 from app.models import Account, GoalContribution, Ledger, SavingsGoal, Transaction, User
-from app.models.enums import AccountKind, TransactionType
+from app.models.enums import AccountKind, Plan, TransactionType
 from app.schemas.goal import (
     ContributionCreate,
     ContributionRead,
@@ -17,9 +17,16 @@ from app.schemas.goal import (
     GoalRead,
     GoalUpdate,
 )
-from app.services.errors import ConflictError, InvalidDataError, NotFoundError
+from app.services.billing import get_plan
+from app.services.errors import (
+    ConflictError,
+    InvalidDataError,
+    NotFoundError,
+    PermissionDeniedError,
+)
 from app.services.scoped import get_in_ledger
 
+FREE_GOALS = 1
 _SAVINGS_KINDS = (AccountKind.SAVINGS, AccountKind.DEPOSIT, AccountKind.CASH)
 
 
@@ -120,7 +127,14 @@ async def list_goals(session: AsyncSession, ledger_id: int) -> list[GoalRead]:
     return [build_read(goal, today) for goal in goals]
 
 
-async def create_goal(session: AsyncSession, ledger_id: int, data: GoalCreate) -> GoalRead:
+async def create_goal(
+    session: AsyncSession, ledger_id: int, user_id: int, data: GoalCreate
+) -> GoalRead:
+    existing = await session.scalar(
+        select(func.count()).select_from(SavingsGoal).where(SavingsGoal.ledger_id == ledger_id)
+    )
+    if existing >= FREE_GOALS and await get_plan(session, user_id) != Plan.PREMIUM:
+        raise PermissionDeniedError("Больше одной копилки доступно в тарифе Premium")
     await _check_goal_account(session, ledger_id, data.account_id)
     goal = SavingsGoal(ledger_id=ledger_id, **data.model_dump())
     session.add(goal)
