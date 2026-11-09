@@ -22,6 +22,8 @@ export interface InvitationPreview { ledger_name: string; invited_email: string;
 export interface AdminStats { users_total: number; users_active: number; users_premium: number; users_new_30d: number; transactions_total: number; registrations: { week_start: string; count: number }[] }
 export interface AdminUser { id: number; email: string; name: string; role: 'user' | 'admin'; is_active: boolean; plan: Plan; created_at: string }
 
+export interface Goal { id: number; ledger_id: number; name: string; target_amount: string; monthly_contribution: string; account_id: number; account_name: string; currency: string; reminder_day: number; saved: string; remaining: string; progress_percent: number; months_left: number; forecast_month: string | null; contributed_this_month: boolean; missed_last_month: boolean; reminder_due: boolean }
+export interface ContributionItem { id: number; user_name: string; amount: string; contributed_on: string; from_transfer: boolean; created_at: string }
 export interface ImportBatch { id: number; filename: string; total_rows: number; created: number; skipped_duplicates: number; errors: number; created_at: string }
 export interface AuditEntry { id: number; actor_email: string; target_email: string; action: string; detail: string; created_at: string }
 export interface Insights {

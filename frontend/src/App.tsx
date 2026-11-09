@@ -10,6 +10,7 @@ import { AnalyticsPage } from './pages/Analytics';
 import { ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage, VerifyEmailPage } from './pages/Auth';
 import { CategoriesPage } from './pages/Categories';
 import { FamilyPage } from './pages/Family';
+import { GoalsPage } from './pages/Goals';
 import { ImportPage } from './pages/Import';
 import { InvitePage } from './pages/Invite';
 import { OnboardingPage } from './pages/Onboarding';
@@ -70,6 +71,7 @@ export function App() {
             <Route path="analytics" element={<AnalyticsPage />} />
             <Route path="accounts" element={<AccountsPage />} />
             <Route path="categories" element={<CategoriesPage />} />
+            <Route path="goals" element={<GoalsPage />} />
             <Route path="import" element={<ImportPage />} />
             <Route path="family" element={<FamilyPage />} />
             <Route path="settings" element={<SettingsPage />} />

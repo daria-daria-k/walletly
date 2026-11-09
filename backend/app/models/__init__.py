@@ -4,6 +4,7 @@ from app.models.auth import AdminAuditEntry, EmailToken, RefreshToken
 from app.models.base import Base
 from app.models.category import Category, CategoryGroup
 from app.models.finance import Account, ImportBatch, Transaction
+from app.models.goal import GoalContribution, SavingsGoal
 from app.models.ledger import Invitation, Ledger, LedgerMember
 from app.models.user import Subscription, User
 
@@ -14,11 +15,13 @@ __all__ = [
     "Category",
     "CategoryGroup",
     "EmailToken",
+    "GoalContribution",
     "ImportBatch",
     "Invitation",
     "Ledger",
     "LedgerMember",
     "RefreshToken",
+    "SavingsGoal",
     "Subscription",
     "Transaction",
     "User",

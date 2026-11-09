@@ -168,3 +168,25 @@
 .auth-card-single>a{margin-top:18px}
 .email-unverified{margin:0;color:var(--muted);font-size:12px}
 .email-unverified button{padding:0;border:0;background:transparent;color:var(--purple);font-weight:700;cursor:pointer}
+
+.goal-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+.goal-card{padding:20px;display:grid;gap:12px;align-content:start;min-width:0}
+.goal-head{display:flex;align-items:center;gap:12px}
+.goal-head>div{flex:1;min-width:0}
+.goal-head h3,.goal-head p{margin:0}
+.goal-head p{margin-top:3px;color:var(--muted);font-size:12px}
+.goal-head>button{border:0;background:transparent;color:var(--muted);cursor:pointer}
+.goal-icon{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;color:var(--purple);background:var(--canvas)}
+.goal-card h2{margin:0;font-size:24px}
+.goal-card h2 small{color:var(--muted);font-size:13px;font-weight:400}
+.goal-progress{height:9px;border-radius:9px;background:var(--canvas);overflow:hidden}
+.goal-progress i{display:block;height:100%;border-radius:inherit;background:var(--purple)}
+.goal-forecast,.goal-note{margin:0;font-size:13px;color:var(--muted)}
+.goal-forecast b{color:var(--ink,inherit)}
+.goal-forecast.done{color:var(--mint-dark);font-weight:700}
+.goal-note.due{color:var(--purple);font-weight:700}
+.goal-move,.goal-history{margin-top:20px;padding-top:16px;border-top:1px solid var(--line)}
+.goal-move h4,.goal-history h4{margin:0 0 10px}
+.goal-history>div{padding:8px 0;display:flex;align-items:center;gap:10px;font-size:13px}
+.goal-history span{flex:1;color:var(--muted)}
+.goal-history button{border:0;background:transparent;color:var(--muted);font-size:18px;cursor:pointer}

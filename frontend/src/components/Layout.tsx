@@ -1,4 +1,4 @@
-import { Bell, BrainCircuit, CreditCard, FileUp, LayoutDashboard, LineChart, LogOut, Menu, Palette, Plus, ReceiptText, Search, Settings, ShieldCheck, Users, X } from 'lucide-react';
+import { Bell, BrainCircuit, CreditCard, FileUp, LayoutDashboard, LineChart, LogOut, Menu, Palette, PiggyBank, Plus, ReceiptText, Search, Settings, ShieldCheck, Users, X } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 import type { TxType } from '../api/types';
@@ -14,6 +14,7 @@ const NAV = [
   { to: '/analytics', label: 'Аналитика', icon: LineChart },
   { to: '/accounts', label: 'Счета', icon: CreditCard },
   { to: '/categories', label: 'Категории', icon: Palette },
+  { to: '/goals', label: 'Копилка', icon: PiggyBank },
   { to: '/family', label: 'Семья', icon: Users },
 ];
 
