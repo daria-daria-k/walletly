@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from app.models import Account, Category, LedgerMember, Transaction
+from app.models import Account, Category, ImportBatch, LedgerMember, Transaction
 from app.models.enums import CategoryType, TransactionType
 from app.schemas.imports import ImportResult, ImportRowError
 from app.services.errors import DomainError, InvalidDataError
@@ -234,6 +234,18 @@ async def import_transactions(
     created = len(new) if not errors else 0
     if created and not dry_run:
         session.add_all(new)
+    # В историю идут настоящие загрузки и файлы с ошибками, а успешная проверка ещё ничего не изменила
+    if errors or (created and not dry_run):
+        session.add(
+            ImportBatch(
+                ledger_id=member.ledger_id,
+                filename=filename[:255],
+                total_rows=len(rows),
+                created=created,
+                skipped_duplicates=skipped,
+                errors=len(errors),
+            )
+        )
         await session.commit()
 
     return ImportResult(
@@ -274,3 +286,15 @@ async def _drop_duplicates(
         else:
             new.append(tx)
     return new, skipped
+
+
+async def import_history(
+    session: AsyncSession, ledger_id: int, limit: int = 10
+) -> list[ImportBatch]:
+    batches = await session.scalars(
+        select(ImportBatch)
+        .where(ImportBatch.ledger_id == ledger_id)
+        .order_by(ImportBatch.id.desc())
+        .limit(limit)
+    )
+    return list(batches)

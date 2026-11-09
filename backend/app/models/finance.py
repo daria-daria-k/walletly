@@ -34,6 +34,21 @@ class Account(Base):
     sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
 
+class ImportBatch(Base):
+    """Запись истории импорта: сколько строк пришло и чем всё закончилось."""
+
+    __tablename__ = "import_batches"
+
+    id: Mapped[IntPK]
+    ledger_id: Mapped[int] = mapped_column(ForeignKey("ledgers.id", ondelete="CASCADE"), index=True)
+    filename: Mapped[str] = mapped_column(String(255))
+    total_rows: Mapped[int] = mapped_column(Integer)
+    created: Mapped[int] = mapped_column(Integer)
+    skipped_duplicates: Mapped[int] = mapped_column(Integer)
+    errors: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[CreatedAt]
+
+
 class Transaction(Base):
     __tablename__ = "transactions"
     __table_args__ = (

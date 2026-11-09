@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException, UploadFile, status
 
 from app.api.deps import Membership, SessionDep
-from app.schemas.imports import ImportResult
-from app.services.importer import MAX_FILE_SIZE, import_transactions
+from app.schemas.imports import ImportBatchRead, ImportResult
+from app.services.importer import MAX_FILE_SIZE, import_history, import_transactions
 
 router = APIRouter(prefix="/ledgers/{ledger_id}/import", tags=["import"])
 
@@ -19,3 +19,11 @@ async def upload(
     if len(content) > MAX_FILE_SIZE:
         raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Файл больше 5 МБ")
     return await import_transactions(session, member, content, filename, dry_run=dry_run)
+
+
+@router.get("/history")
+async def history(member: Membership, session: SessionDep) -> list[ImportBatchRead]:
+    return [
+        ImportBatchRead.model_validate(batch)
+        for batch in await import_history(session, member.ledger_id)
+    ]
