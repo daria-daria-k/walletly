@@ -8,7 +8,7 @@ export interface User { id: number; email: string; name: string; role: 'user' | 
 export interface Ledger { id: number; name: string; type: 'personal' | 'shared'; owner_id: number; created_at: string; role: Role }
 export interface Member { user_id: number; name: string; email: string; role: Role; joined_at: string }
 export interface Account { id: number; name: string; currency: string; kind: AccountKind; initial_balance: string; balance: string; month_change: string; is_active: boolean; sort_order: number }
-export interface Category { id: number; category_group_id: number; name: string; monthly_limit: string | null; is_active: boolean; sort_order: number }
+export interface Category { id: number; category_group_id: number; name: string; icon_key: string | null; monthly_limit: string | null; is_active: boolean; sort_order: number }
 export interface CategoryGroup { id: number; name: string; type: 'income' | 'expense'; sort_order: number; categories: Category[] }
 export interface Transaction { id: number; ledger_id: number; user_id: number; author_name: string; type: TxType; amount: string; account_id: number; to_account_id: number | null; category_id: number | null; description: string | null; tx_date: string; created_at: string }
 export interface TransactionPage { items: Transaction[]; total: number; limit: number; offset: number }

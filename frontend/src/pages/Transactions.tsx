@@ -10,7 +10,8 @@ import { TransactionModal } from '../components/TransactionModal';
 import { StyledSelect } from '../components/StyledSelect';
 import { ErrorState, LoadingState, Metric, PageHeading, StateCard } from '../components/ui';
 import { useAccounts, useCategoryGroups } from '../lib/data';
-import { categoryEmoji, money, monthRange, monthTitle, shortDate, signedMoney } from '../lib/format';
+import { money, monthRange, monthTitle, shortDate, signedMoney } from '../lib/format';
+import { CategoryIcon, CategoryTag } from '../components/CategoryIcon';
 import { useLedger } from '../ledger';
 
 const PAGE_SIZE = 30;
@@ -44,7 +45,7 @@ export function TransactionsPage() {
   });
 
   const accountById = new Map(accounts.map((account) => [account.id, account]));
-  const categoryName = new Map(groups.flatMap((group) => group.categories.map((category) => [category.id, category.name] as const)));
+  const categoryById = new Map(groups.flatMap((group) => group.categories.map((category) => [category.id, category] as const)));
   const activeFilters = [filters.account_id, filters.category_id, filters.date_from, filters.date_to].filter(Boolean).length;
   const monthName = monthTitle().split(' ')[0];
   const net = Number(summary?.net ?? 0);
@@ -91,13 +92,13 @@ export function TransactionsPage() {
             <div className="table-head"><span>Дата</span><span>Операция</span><span>Категория</span><span>Счёт</span><span>Сумма</span><span /></div>
             {data?.items.map((tx) => {
               const account = accountById.get(tx.account_id);
-              const category = categoryName.get(tx.category_id ?? 0);
+              const category = categoryById.get(tx.category_id ?? 0);
               const sign = tx.type === 'income' ? '+ ' : tx.type === 'expense' ? '− ' : '';
               return (
                 <div className="table-row" key={tx.id}>
                   <span>{shortDate(tx.tx_date)}</span>
-                  <span className="operation-name"><i>{categoryEmoji(category, tx.type)}</i><b>{tx.description || category || 'Перевод'}</b></span>
-                  <span><em>{tx.type === 'transfer' ? 'Перевод' : category}</em></span>
+                  <span className="operation-name"><i><CategoryIcon name={category?.name} iconKey={category?.icon_key} type={tx.type} size="small" /></i><b>{tx.description || category?.name || 'Перевод'}</b></span>
+                  <span><CategoryTag name={category?.name} iconKey={category?.icon_key} type={tx.type} /></span>
                   <span>{account?.name}{tx.to_account_id ? ` → ${accountById.get(tx.to_account_id)?.name}` : ''}</span>
                   <strong className={tx.type === 'income' ? 'income-text' : ''}>{sign}{money(tx.amount, account?.currency)}</strong>
                   {canEdit(tx) ? <button aria-label="Действия" title="Изменить" onClick={() => setEditing(tx)}><MoreHorizontal size={18} /></button> : <span />}

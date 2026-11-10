@@ -9,7 +9,8 @@ import { useAddOperation } from '../components/Layout';
 import { StyledSelect } from '../components/StyledSelect';
 import { ErrorState, LoadingState, State } from '../components/ui';
 import { useAccounts, useCategoryGroups } from '../lib/data';
-import { capitalize, categoryEmoji, changePercent, money, monthDative, monthRange, monthTitle, samePeriodRange, shortDate, signedPercent } from '../lib/format';
+import { capitalize, changePercent, money, monthDative, monthRange, monthTitle, samePeriodRange, shortDate, signedPercent } from '../lib/format';
+import { CategoryIcon } from '../components/CategoryIcon';
 import { useLedger } from '../ledger';
 
 const DONUT = ['var(--coral)', 'var(--purple)', 'var(--yellow)', 'var(--mint)'];
@@ -72,7 +73,7 @@ export function OverviewPage() {
   const balance = rubAccounts.reduce((sum, account) => sum + Number(account.balance), 0);
   const monthChange = rubAccounts.reduce((sum, account) => sum + Number(account.month_change), 0);
   const balanceGrowth = changePercent(balance, balance - monthChange);
-  const categoryName = new Map(groups.flatMap((group) => group.categories.map((category) => [category.id, category.name] as const)));
+  const categoryById = new Map(groups.flatMap((group) => group.categories.map((category) => [category.id, category] as const)));
 
   const income = Number(summary?.income ?? 0);
   const expense = Number(summary?.expense ?? 0);
@@ -163,7 +164,7 @@ export function OverviewPage() {
             <div className="category-list">
               {budgets.map((item, index) => (
                 <div key={item.id} className="category-row">
-                  <div><span>{item.name}</span><b>{money(item.spent)} <small>/ {money(item.limit)}</small></b></div>
+                  <div><span className="category-row-label"><CategoryIcon name={item.name} iconKey={item.icon_key} size="small" /><span>{item.name}</span></span><b>{money(item.spent)} <small>/ {money(item.limit)}</small></b></div>
                   <div className="progress"><span style={{ width: `${Math.min(100, (item.spent / item.limit) * 100)}%`, background: item.spent > item.limit ? 'var(--coral)' : DONUT[(index + 1) % 4] }} /></div>
                 </div>
               ))}
@@ -179,12 +180,12 @@ export function OverviewPage() {
           {latest?.items.length === 0 ? <State>Операций пока нет</State> : (
             <div className="transaction-list">
               {latest?.items.map((tx) => {
-                const category = categoryName.get(tx.category_id ?? 0);
+                const category = categoryById.get(tx.category_id ?? 0);
                 const sign = tx.type === 'income' ? '+ ' : tx.type === 'expense' ? '− ' : '';
                 return (
                   <div className="transaction" key={tx.id}>
-                    <span className="transaction-icon">{categoryEmoji(category, tx.type)}</span>
-                    <div><b>{tx.description || category || 'Перевод'}</b><small>{tx.type === 'transfer' ? 'Перевод' : category} · {shortDate(tx.tx_date)}</small></div>
+                    <span className="transaction-icon"><CategoryIcon name={category?.name} iconKey={category?.icon_key} type={tx.type} size="small" /></span>
+                    <div><b>{tx.description || category?.name || 'Перевод'}</b><small>{tx.type === 'transfer' ? 'Перевод' : category?.name} · {shortDate(tx.tx_date)}</small></div>
                     <strong className={tx.type}>{sign}{money(tx.amount)}</strong>
                   </div>
                 );

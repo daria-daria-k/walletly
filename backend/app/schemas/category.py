@@ -22,6 +22,7 @@ class CategoryCreate(BaseModel):
     category_group_id: int
     name: Name50
     monthly_limit: PositiveMoney | None = None
+    icon_key: str | None = Field(default=None, max_length=50)
     sort_order: int = 0
 
 
@@ -30,6 +31,7 @@ class CategoryUpdate(BaseModel):
     name: Name50 = Field(default=None)
     # null здесь осмысленный: снять лимит
     monthly_limit: PositiveMoney | None = None
+    icon_key: str | None = Field(default=None, max_length=50)
     is_active: bool = Field(default=None)
     sort_order: int = Field(default=None)
 
@@ -40,6 +42,7 @@ class CategoryRead(BaseModel):
     id: int
     category_group_id: int
     name: str
+    icon_key: str | None
     monthly_limit: Decimal | None
     is_active: bool
     sort_order: int

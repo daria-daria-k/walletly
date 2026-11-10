@@ -40,6 +40,56 @@
 .file-input{display:block;margin-bottom:12px;font-size:14px}
 .settings-stack{display:grid;gap:18px}
 .settings-panel .form-error,.settings-panel .form-ok{margin-top:14px}
+.category-icon{--category-color:#8792a3;--category-accent:#68bda5;position:relative;width:46px;height:46px;border:1.5px solid color-mix(in srgb,var(--category-color) 58%,white);border-radius:15px;background:color-mix(in srgb,var(--category-color) 8%,white);display:grid;place-items:center;flex:0 0 auto;box-shadow:0 5px 15px color-mix(in srgb,var(--category-color) 12%,transparent)}
+.category-icon-core{width:31px;height:31px;border-radius:10px;color:#fff;background:var(--category-color);display:grid;place-items:center;box-shadow:0 4px 9px color-mix(in srgb,var(--category-color) 35%,transparent)}
+.category-icon-core svg{width:19px;height:19px;color:#fff;stroke:#fff;stroke-width:2.3}
+.category-icon-accent{position:absolute;top:5px;right:4px;width:14px;height:14px;border:2px solid #fff;border-radius:50%;background:var(--category-accent);box-shadow:0 2px 5px #15223826}
+.category-icon-small{width:30px;height:30px;border-radius:10px;box-shadow:none}
+.category-icon-small .category-icon-core{width:21px;height:21px;border-radius:7px;box-shadow:none}
+.category-icon-small .category-icon-core svg{width:14px;height:14px;stroke-width:2.5}
+.category-icon-small .category-icon-accent{top:2px;right:1px;width:9px;height:9px;border-width:1.5px}
+.category-budget-row{width:100%;display:grid!important;grid-template-columns:46px minmax(0,1fr);align-items:center;gap:12px;justify-content:initial!important}
+.category-budget-content{min-width:0}
+.category-budget-content>div:first-child{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px}
+.category-budget-content .progress{margin:8px 0 5px}
+.category-budget-content small{display:block}
+.category-row-label{display:flex;align-items:center;gap:8px}
+.category-tag{--category-color:#8792a3;width:max-content;max-width:100%;padding:5px 9px;border:1px solid color-mix(in srgb,var(--category-color) 24%,transparent);border-radius:99px;color:color-mix(in srgb,var(--category-color) 78%,#172033);background:color-mix(in srgb,var(--category-color) 13%,white);display:inline-block;font-size:10px;font-weight:700;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.category-icon-picker{min-width:0;margin:0;padding:0;border:0}
+.category-icon-picker legend{margin-bottom:7px;color:#566476;font-size:11px;font-weight:800}
+.category-icon-picker-grid{max-height:190px;padding:8px;border:1px solid #dfe5e9;border-radius:13px;background:#f7f8fb;display:grid;grid-template-columns:repeat(7,1fr);gap:6px;overflow:auto}
+.category-icon-picker-grid button{min-width:0;padding:4px;border:2px solid transparent;border-radius:11px;background:transparent;display:grid;place-items:center}
+.category-icon-picker-grid button:hover{background:#fff}
+.category-icon-picker-grid button.selected{border-color:var(--mint-dark);background:#fff;box-shadow:0 0 0 2px color-mix(in srgb,var(--mint) 15%,transparent)}
+.category-icon-picker>p{margin:7px 2px 0;color:var(--muted);font-size:10px}
+.transaction-icon{background:transparent!important}
+.operation-name>i{background:transparent!important}
+.trend-item{grid-template-columns:46px minmax(0,1fr) auto!important}
+.trend-icon{width:46px;height:46px;display:grid;place-items:center;align-self:center}
+.trend-item .category-icon{display:grid;margin-top:0;color:inherit;font-size:inherit}
+.trend-item .category-icon-core{display:grid;margin-top:0;color:#fff;font-size:0}
+.trend-item .category-icon-accent{display:block;margin-top:0;color:inherit;font-size:0}
+.template-preview>span{display:flex;align-items:center;gap:7px}
+.icon-gallery{min-height:100vh;padding:56px clamp(20px,5vw,72px) 80px;color:var(--ink);background:var(--canvas)}
+.icon-gallery-hero{max-width:720px;margin:0 auto 48px;text-align:center}
+.icon-gallery-brand{margin-bottom:40px;display:flex;align-items:center;justify-content:center;gap:10px;font-size:22px;font-weight:900}
+.icon-gallery-brand img{width:42px;height:42px}
+.icon-gallery-hero h1{font-size:clamp(36px,6vw,64px);letter-spacing:-2.5px}
+.icon-gallery-hero>p:last-child{max-width:590px;margin:14px auto 0;color:var(--muted);font-size:16px;line-height:1.6}
+.icon-gallery-groups{max-width:1240px;margin:0 auto;display:grid;gap:28px}
+.icon-gallery-group{padding:28px;border:1px solid var(--line);border-radius:28px;background:var(--surface);box-shadow:0 14px 45px #211c350a}
+.icon-gallery-heading{margin-bottom:22px;display:flex;align-items:center;gap:14px}
+.icon-gallery-heading>span{width:44px;height:44px;border-radius:14px;color:var(--mint-dark);background:color-mix(in srgb,var(--mint) 13%,white);display:grid;place-items:center;font-size:12px;font-weight:900}
+.icon-gallery-heading h2{margin:0;font-size:21px}
+.icon-gallery-heading p{margin:5px 0 0;color:var(--muted);font-size:12px}
+.icon-gallery-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.icon-gallery-card{min-height:92px;padding:16px;border:1px solid var(--line);border-radius:19px;background:var(--surface);display:flex;align-items:center;gap:15px;transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+.icon-gallery-card:hover{border-color:color-mix(in srgb,var(--category-color,var(--mint)) 45%,var(--line));box-shadow:0 9px 24px #211c350d;transform:translateY(-2px)}
+.icon-gallery-card h3{margin:0;font-size:14px;line-height:1.25}
+.icon-gallery-card p{margin:5px 0 0;color:var(--muted);font-size:10px}
+@media(max-width:900px){.icon-gallery-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.icon-gallery{padding:30px 14px 50px}.icon-gallery-hero{margin-bottom:30px}.icon-gallery-brand{margin-bottom:28px}.icon-gallery-group{padding:18px;border-radius:22px}.icon-gallery-grid{grid-template-columns:1fr}.icon-gallery-card{min-height:82px}}
+@media(max-width:520px){.category-icon-picker-grid{grid-template-columns:repeat(6,1fr)}}
 @media(max-width:900px){.admin-table .table-head{display:none}.admin-table .table-row{grid-template-columns:1fr;gap:6px}}
 /* На телефоне строка операции — карточка: сначала название и сумма, детали ниже */
 @media(max-width:640px){

@@ -8,7 +8,8 @@ import { useAuth } from '../auth';
 import { StyledSelect } from '../components/StyledSelect';
 import { ErrorNote, PageHeading } from '../components/ui';
 import { useCategoryGroups } from '../lib/data';
-import { categoryEmoji, KIND_OPTIONS, plural } from '../lib/format';
+import { KIND_OPTIONS, plural } from '../lib/format';
+import { CategoryIcon } from '../components/CategoryIcon';
 import { useLedger } from '../ledger';
 
 const STEPS = [
@@ -47,7 +48,7 @@ export function OnboardingPage() {
 
   // Как в макете: в шаблоне сначала показываем расходы, с ними человек работает каждый день
   const ordered = [...groups].sort((a, b) => Number(a.type === 'income') - Number(b.type === 'income'));
-  const categories = ordered.flatMap((group) => group.categories.map((category) => ({ name: category.name, type: group.type })));
+  const categories = ordered.flatMap((group) => group.categories.map((category) => ({ name: category.name, iconKey: category.icon_key, type: group.type })));
   const finished = step === 4;
 
   async function finishSetup() {
@@ -142,7 +143,7 @@ export function OnboardingPage() {
               <h2>Базовый набор категорий</h2>
               <p>Мы подготовили шаблон. Категории и лимиты можно менять в любое время.</p>
               <div className="template-preview">
-                {categories.slice(0, 4).map((item) => <span key={item.name}>{categoryEmoji(item.name, item.type)} {item.name}</span>)}
+                {categories.slice(0, 4).map((item) => <span key={item.name}><CategoryIcon name={item.name} iconKey={item.iconKey} type={item.type} size="small" /> {item.name}</span>)}
                 {categories.length > 4 && <span>＋ Ещё {categories.length - 4}</span>}
               </div>
             </>

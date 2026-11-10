@@ -9,6 +9,7 @@ import { AiPage } from './pages/Ai';
 import { AnalyticsPage } from './pages/Analytics';
 import { ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage, VerifyEmailPage } from './pages/Auth';
 import { CategoriesPage } from './pages/Categories';
+import { CategoryIconsPage } from './pages/CategoryIcons';
 import { FamilyPage } from './pages/Family';
 import { GoalsPage } from './pages/Goals';
 import { ImportPage } from './pages/Import';
@@ -52,7 +53,8 @@ function AppShell() {
 
 export function App() {
   const { loading } = useAuth();
-  if (loading) return <WalletlyPreloader />;
+  const location = useLocation();
+  if (loading && location.pathname !== '/category-icons') return <WalletlyPreloader />;
 
   return (
     <Routes>
@@ -61,6 +63,7 @@ export function App() {
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
+      <Route path="/category-icons" element={<CategoryIconsPage />} />
       <Route element={<RequireAuth />}>
         <Route path="/invite/:token" element={<InvitePage />} />
         <Route element={<AppShell />}>

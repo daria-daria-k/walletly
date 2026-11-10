@@ -34,6 +34,8 @@ class Category(Base):
         ForeignKey("category_groups.id", ondelete="RESTRICT")
     )
     name: Mapped[str] = mapped_column(String(50))
+    # Стабильный ключ визуального значка: имя категории можно менять независимо от него
+    icon_key: Mapped[str | None] = mapped_column(String(50), nullable=True)
     # Лимит расходов в месяц; None — без лимита. Отдельной таблицы нет: лимит один на категорию
     monthly_limit: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     is_active: Mapped[bool] = mapped_column(default=True, server_default=true())

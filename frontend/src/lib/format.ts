@@ -69,18 +69,6 @@ export function signedMoney(value: number, currency = 'RUB'): string {
   return `${value > 0 ? '+' : value < 0 ? '−' : ''}${money(Math.abs(value), currency)}`;
 }
 
-const EMOJI: [RegExp, string][] = [
-  [/продукт/i, '🛒'], [/жиль|жкх|дом|ремонт/i, '🏠'], [/транспорт|такси/i, '🚕'], [/кафе|ресторан/i, '☕'],
-  [/связь|интернет/i, '📱'], [/здоров/i, '💊'], [/развлеч/i, '🎬'], [/одежд/i, '👕'], [/красот/i, '💅'],
-  [/подписк/i, '🔁'], [/техник/i, '💻'], [/путешеств/i, '✈️'], [/обучен/i, '📚'], [/зарплат/i, '💼'],
-  [/кешб|процент/i, '💰'], [/подар/i, '🎁'],
-];
-
-export function categoryEmoji(name: string | undefined, type: 'income' | 'expense' | 'transfer'): string {
-  if (type === 'transfer') return '🔄';
-  return EMOJI.find(([pattern]) => pattern.test(name ?? ''))?.[1] ?? (type === 'income' ? '💵' : '🧾');
-}
-
 export const KIND_LABEL = { card: 'Банковская карта', savings: 'Накопительный счёт', deposit: 'Вклад', cash: 'Наличные' };
 
 export const KIND_OPTIONS = Object.entries(KIND_LABEL).map(([value, label]) => ({ value, label }));

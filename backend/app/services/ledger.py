@@ -4,7 +4,7 @@ from sqlalchemy.orm import joinedload
 
 from app.models import Account, Category, CategoryGroup, Ledger, LedgerMember, Transaction, User
 from app.models.enums import LedgerType, MemberRole
-from app.services.category_template import DEFAULT_CATEGORY_GROUPS
+from app.services.category_template import DEFAULT_CATEGORY_GROUPS, DEFAULT_CATEGORY_ICONS
 from app.services.errors import ConflictError, NotFoundError, PermissionDeniedError
 
 
@@ -17,7 +17,12 @@ async def add_default_categories(session: AsyncSession, ledger_id: int) -> None:
             ledger_id=ledger_id, name=group_name, type=category_type, sort_order=group_order
         )
         group.categories = [
-            Category(ledger_id=ledger_id, name=name, sort_order=order)
+            Category(
+                ledger_id=ledger_id,
+                name=name,
+                icon_key=DEFAULT_CATEGORY_ICONS.get(name),
+                sort_order=order,
+            )
             for order, name in enumerate(category_names)
         ]
         session.add(group)

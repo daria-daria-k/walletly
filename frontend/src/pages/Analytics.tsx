@@ -5,8 +5,9 @@ import { api } from '../api/client';
 import type { CategoryTotal, MonthTotal, Summary } from '../api/types';
 import { StyledSelect } from '../components/StyledSelect';
 import { Metric, PageHeading, State } from '../components/ui';
-import { useAccounts } from '../lib/data';
-import { capitalize, categoryEmoji, changePercent, isoDate, money, monthDative, monthRange, monthTitle, samePeriodRange, signedPercent } from '../lib/format';
+import { useAccounts, useCategoryGroups } from '../lib/data';
+import { capitalize, changePercent, isoDate, money, monthDative, monthRange, monthTitle, samePeriodRange, signedPercent } from '../lib/format';
+import { CategoryIcon } from '../components/CategoryIcon';
 import { useLedger } from '../ledger';
 
 const PERIODS = [0, -1, -2, -3, -4, -5];
@@ -14,6 +15,7 @@ const PERIODS = [0, -1, -2, -3, -4, -5];
 export function AnalyticsPage() {
   const { base } = useLedger();
   const { data: accounts = [] } = useAccounts(true);
+  const { data: groups = [] } = useCategoryGroups();
   const [offset, setOffset] = useState(0);
   const [chosenCurrency, setCurrency] = useState<string | null>(null);
 
@@ -50,6 +52,7 @@ export function AnalyticsPage() {
   const monthProgress = Math.round((dayOfMonth / daysInMonth) * 100);
 
   const before = new Map(priorCategories.map((row) => [row.category_id, Number(row.total)]));
+  const categoryIcon = new Map(groups.flatMap((group) => group.categories.map((category) => [category.id, category.icon_key] as const)));
   const trends = categories
     .filter((row) => (before.get(row.category_id) ?? 0) > 0)
     .map((row) => {
@@ -130,7 +133,7 @@ export function AnalyticsPage() {
           <div className="trend-list">
             {trends.map((item) => (
               <div className="trend-item" key={item.id}>
-                <i>{categoryEmoji(item.name, 'expense')}</i>
+                <div className="trend-icon"><CategoryIcon name={item.name} iconKey={categoryIcon.get(item.id)} /></div>
                 <div><b>{item.name}</b><span>{item.diff < 0 ? 'Экономия' : 'Рост на'} {money(Math.abs(item.diff), currency)}</span></div>
                 <strong className={item.diff < 0 ? 'good' : ''}>{signedPercent(item.percent)}</strong>
               </div>

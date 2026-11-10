@@ -3,6 +3,7 @@ import { MoreHorizontal, Plus } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { api, errorText } from '../api/client';
 import type { Category, CategoryGroup, CategoryTotal } from '../api/types';
+import { CATEGORY_ICON_OPTIONS, CategoryIcon } from '../components/CategoryIcon';
 import { StyledSelect } from '../components/StyledSelect';
 import { ErrorNote, ErrorState, LoadingState, Modal, PageHeading } from '../components/ui';
 import { useCategoryGroups, useRefreshLedgerData } from '../lib/data';
@@ -62,12 +63,13 @@ function CategoryModal({ groups, category, groupId, onClose }: { groups: Categor
   const [name, setName] = useState(category?.name ?? '');
   const [group, setGroup] = useState(String(category?.category_group_id ?? groupId ?? groups.find((g) => g.type === 'expense')?.id ?? ''));
   const [limit, setLimit] = useState(category?.monthly_limit ?? '');
+  const [iconKey, setIconKey] = useState(category?.icon_key ?? category?.name ?? 'Прочее');
   const selected = groups.find((g) => String(g.id) === group);
 
   function submit(event: FormEvent) {
     event.preventDefault();
     const monthly_limit = selected?.type === 'expense' && String(limit).trim() ? String(limit).replace(/\s/g, '').replace(',', '.') : null;
-    const body = { name, category_group_id: Number(group), monthly_limit };
+    const body = { name, category_group_id: Number(group), monthly_limit, icon_key: iconKey };
     act(() => (category ? api(`${base}/categories/${category.id}`, { method: 'PATCH', body }) : api(`${base}/categories`, { method: 'POST', body })));
   }
 
@@ -76,6 +78,17 @@ function CategoryModal({ groups, category, groupId, onClose }: { groups: Categor
       <form onSubmit={submit} style={{ marginTop: 16 }}>
         <label>Название<input value={name} onChange={(e) => setName(e.target.value)} maxLength={50} required autoFocus /></label>
         <label>Группа<StyledSelect ariaLabel="Группа" value={group} onChange={setGroup} options={groups.filter((g) => !category || g.type === groups.find((x) => x.id === category.category_group_id)?.type).map((g) => ({ value: String(g.id), label: g.name }))} /></label>
+        <fieldset className="category-icon-picker">
+          <legend>Иконка</legend>
+          <div className="category-icon-picker-grid">
+            {CATEGORY_ICON_OPTIONS.map((option) => (
+              <button key={option} type="button" className={iconKey === option ? 'selected' : ''} aria-label={option} aria-pressed={iconKey === option} title={option} onClick={() => setIconKey(option)}>
+                <CategoryIcon iconKey={option} size="small" />
+              </button>
+            ))}
+          </div>
+          <p>Выбрано: <b>{iconKey}</b></p>
+        </fieldset>
         {selected?.type === 'expense' && <label>Лимит в месяц, необязательно<input inputMode="decimal" value={limit} onChange={(e) => setLimit(e.target.value)} placeholder="Без лимита" /></label>}
         <ErrorNote text={error} />
         <button className="primary-button submit">Сохранить</button>
@@ -125,11 +138,14 @@ export function CategoriesPage() {
                 const limit = Number(category.monthly_limit ?? 0);
                 const percent = limit ? Math.round((total / limit) * 100) : null;
                 const body = (
-                  <>
-                    <div><b>{category.name}</b><span>{money(total)}</span></div>
-                    {percent !== null && <div className="progress"><span style={{ width: `${Math.min(100, percent)}%`, background: percent > 100 ? 'var(--coral)' : undefined }} /></div>}
-                    <small>{!category.is_active ? 'В архиве' : percent !== null ? `${percent}% лимита · ${money(limit)}` : group.type === 'expense' ? 'Без лимита' : 'В этом месяце'}</small>
-                  </>
+                  <div className="category-budget-row">
+                    <CategoryIcon name={category.name} iconKey={category.icon_key} type={group.type} />
+                    <div className="category-budget-content">
+                      <div><b>{category.name}</b><span>{money(total)}</span></div>
+                      {percent !== null && <div className="progress"><span style={{ width: `${Math.min(100, percent)}%`, background: percent > 100 ? 'var(--coral)' : undefined }} /></div>}
+                      <small>{!category.is_active ? 'В архиве' : percent !== null ? `${percent}% лимита · ${money(limit)}` : group.type === 'expense' ? 'Без лимита' : 'В этом месяце'}</small>
+                    </div>
+                  </div>
                 );
                 return canManage
                   ? <button key={category.id} className={`budget-item editable ${category.is_active ? '' : 'archived'}`} onClick={() => setDialog({ kind: 'category', category })}>{body}</button>
